@@ -1,6 +1,6 @@
 {
   "name": "univiewer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Open-source React viewer for PDF, DOCX, DWG, DXF, XLSX, images and more",
   "main": "dist/uniview.cjs.js",
   "module": "dist/uniview.esm.js",
@@ -11,6 +11,8 @@
     "dist/**/*.css",
     "dist/**/*.d.ts",
     "dist/index.d.ts",
+    "workers/**",
+    "scripts/postinstall.mjs",
     "README.md",
     "LICENSE"
   ],
@@ -62,6 +64,7 @@
     "test:e2e": "playwright test",
     "build:demo": "npm run build:workers && vite build --config vite.demo.config.ts",
     "build:docs": "npm run build:demo",
+    "postinstall": "node scripts/postinstall.mjs",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
