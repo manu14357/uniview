@@ -35,6 +35,10 @@ export default defineConfig({
       '@uniview/dxf-parser': resolve(__dirname, 'src/vendor/uniview-dwg/uniview-dxf-parser'),
     },
   },
+  define: {
+    global: 'globalThis',
+    __UNIVIEW_CACHE_BUST__: JSON.stringify(Date.now().toString(36)),
+  },
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
@@ -53,7 +57,7 @@ export default defineConfig({
         preserveModules: false,
       },
     },
-    sourcemap: true,
+    sourcemap: false,
     minify: 'terser',
     target: 'es2020',
   },

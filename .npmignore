@@ -1,0 +1,28 @@
+# Source & development files
+src/
+demo/
+docs/
+tests/
+.github/
+
+# Config files
+vite.config.ts
+vite.demo.config.ts
+vite.workers.config.ts
+tsconfig.json
+tailwind.config.ts
+postcss.config.js
+.eslintrc.json
+.prettierrc
+
+# Dev artifacts
+node_modules/
+coverage/
+test-results/
+playwright-report/
+*.local
+.DS_Store
+
+# Docs
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md

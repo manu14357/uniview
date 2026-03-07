@@ -1,21 +1,31 @@
 {
-  "name": "uniview",
+  "name": "univiewer",
   "version": "1.0.0",
   "description": "Open-source React viewer for PDF, DOCX, DWG, DXF, XLSX, images and more",
   "main": "dist/uniview.cjs.js",
   "module": "dist/uniview.esm.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist/**/*.js",
+    "dist/**/*.mjs",
+    "dist/**/*.css",
+    "dist/**/*.d.ts",
+    "dist/index.d.ts",
+    "README.md",
+    "LICENSE"
   ],
   "exports": {
     ".": {
       "import": "./dist/uniview.esm.js",
       "require": "./dist/uniview.cjs.js",
       "types": "./dist/index.d.ts"
-    }
+    },
+    "./style.css": "./dist/style.css"
   },
   "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "pdf viewer",
     "dwg viewer",
@@ -29,13 +39,19 @@
     "threejs"
   ],
   "license": "MIT",
+  "author": "manu14357",
+  "homepage": "https://manu14357.github.io/uniview/",
+  "bugs": {
+    "url": "https://github.com/manu14357/uniview/issues"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/manu14357/uniview"
+    "url": "git+https://github.com/manu14357/uniview.git"
   },
   "scripts": {
     "dev": "vite --config vite.demo.config.ts",
     "build": "vite build",
+    "build:lib": "vite build && npm pack --dry-run",
     "build:types": "tsc --emitDeclarationOnly --outDir dist",
     "build:workers": "WORKER_INDEX=0 vite build --config vite.workers.config.ts && WORKER_INDEX=1 vite build --config vite.workers.config.ts && WORKER_INDEX=2 vite build --config vite.workers.config.ts && cp src/vendor/uniview-dwg/uniview-dwg-wasm/libredwg-web.wasm demo/public/workers/",
     "preview": "vite preview",
@@ -46,7 +62,7 @@
     "test:e2e": "playwright test",
     "build:demo": "npm run build:workers && vite build --config vite.demo.config.ts",
     "build:docs": "npm run build:demo",
-    "prepublishOnly": "npm run build && npm run build:types"
+    "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
