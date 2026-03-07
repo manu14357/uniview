@@ -158,7 +158,7 @@ export default defineConfig({
     alias: aliases,
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
   },
-  define: { global: 'globalThis', __WASM_BASE_PATH__: JSON.stringify('/workers') },
+  define: { global: 'globalThis' },
   build: {
     outDir: resolve(__dirname, 'demo/public/workers'),
     emptyOutDir: idx === 0, // Only clear on first worker

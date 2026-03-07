@@ -1,10 +1,20 @@
 import { Dwg_File_Type, LibreDwg } from '@uniview/dwg-wasm'
 
-declare const __WASM_BASE_PATH__: string
+/**
+ * Derive the WASM directory from the worker script's own URL at runtime.
+ * This works regardless of deployment base path (e.g. /uniview/demo/workers/).
+ */
+function getWasmBasePath(): string | undefined {
+  if (typeof self !== 'undefined' && self.location) {
+    const href = self.location.href
+    const lastSlash = href.lastIndexOf('/')
+    if (lastSlash >= 0) return href.substring(0, lastSlash)
+  }
+  return undefined
+}
 
 export async function parseDwg(data: string) {
-  // __WASM_BASE_PATH__ is injected at build time by Vite (vite.workers.config.ts).
-  const basePath = typeof __WASM_BASE_PATH__ !== 'undefined' ? __WASM_BASE_PATH__ : undefined
+  const basePath = getWasmBasePath()
   const libredwg = await LibreDwg.create(basePath)
   if (libredwg == null) {
     throw new Error('libredwg is not loaded!')
