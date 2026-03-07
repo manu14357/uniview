@@ -1,6 +1,5 @@
 node_modules/
 dist/
-docs/demo/
 *.local
 .DS_Store
 coverage/
