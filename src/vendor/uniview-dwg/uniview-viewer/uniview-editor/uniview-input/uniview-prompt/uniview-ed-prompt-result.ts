@@ -1,0 +1,32 @@
+import { UvEdPromptStatus } from './uniview-ed-prompt-status'
+
+/**
+ * Base class for a prompt result, similar to `Autodesk.AutoCAD.EditorInput.PromptResult`.
+ * This class encapsulates common information returned by prompt methods.
+ */
+export class UvEdPromptResult {
+  /**
+   * The status of the prompt (e.g. OK, Cancel, Error).
+   * Modeled on `PromptStatus` in the AutoCAD .NET API.
+   */
+  status: UvEdPromptStatus
+
+  /**
+   * An optional string result.
+   * This is typically set when `status` is `Keyword` or when the prompt
+   * returns a string as its primary result.
+   * Corresponds to `PromptResult.StringResult` in the .NET API.
+   */
+  stringResult?: string
+
+  /**
+   * Constructs a new `UvEdPromptResult`.
+   * @param status The prompt status.
+   * @param stringResult Optional string result.
+   * @param message Optional message.
+   */
+  constructor(status: UvEdPromptStatus, stringResult?: string) {
+    this.status = status
+    this.stringResult = stringResult
+  }
+}

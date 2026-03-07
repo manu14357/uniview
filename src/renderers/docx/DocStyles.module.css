@@ -1,0 +1,93 @@
+.uv-docx-content {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 60px;
+  background: white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
+}
+
+.uv-docx-content h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 24px 0 12px;
+  color: #1a1a1a;
+}
+
+.uv-docx-content h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 20px 0 10px;
+  color: #1a1a1a;
+}
+
+.uv-docx-content h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 16px 0 8px;
+  color: #1a1a1a;
+}
+
+.uv-docx-content p {
+  margin: 8px 0;
+}
+
+.uv-docx-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+}
+
+.uv-docx-content table td,
+.uv-docx-content table th {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+.uv-docx-content table th {
+  background-color: #f5f5f5;
+  font-weight: 600;
+}
+
+.uv-docx-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+.uv-docx-content ul,
+.uv-docx-content ol {
+  padding-left: 24px;
+  margin: 8px 0;
+}
+
+.uv-docx-content blockquote {
+  border-left: 3px solid #ccc;
+  padding-left: 16px;
+  margin: 12px 0;
+  color: #666;
+}
+
+/* Dark mode */
+:global(.uv-dark) .uv-docx-content {
+  background: #1e1e1e;
+  color: #d4d4d4;
+}
+
+:global(.uv-dark) .uv-docx-content h1,
+:global(.uv-dark) .uv-docx-content h2,
+:global(.uv-dark) .uv-docx-content h3 {
+  color: #e0e0e0;
+}
+
+:global(.uv-dark) .uv-docx-content table td,
+:global(.uv-dark) .uv-docx-content table th {
+  border-color: #444;
+}
+
+:global(.uv-dark) .uv-docx-content table th {
+  background-color: #2d2d2d;
+}

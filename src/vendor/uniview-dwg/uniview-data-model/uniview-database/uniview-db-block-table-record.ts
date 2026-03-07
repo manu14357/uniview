@@ -1,0 +1,305 @@
+import { UvGePoint3d } from '@uniview/geometry'
+
+import { UvDbObjectId } from '../uniview-base/uniview-db-object'
+import { UvDbEntity } from '../uniview-entity/uniview-db-entity'
+import { UvDbObjectIterator } from '../uniview-misc/uniview-db-object-iterator'
+import { UvDbSymbolTableRecord } from './uniview-db-symbol-table-record'
+
+/**
+ * Block table record that serves as a container for entities within drawing databases.
+ *
+ * Block table records (BTRs) are used to organize and group entities together.
+ * There are two special BTRs that are always present in every database:
+ * - *MODEL_SPACE: Contains entities in model space
+ * - *PAPER_SPACE: Contains entities in paper space
+ *
+ * Each block table record has an origin point and can contain multiple entities.
+ *
+ * @example
+ * ```typescript
+ * const blockRecord = new UvDbBlockTableRecord();
+ * blockRecord.name = 'MyBlock';
+ * blockRecord.origin = new UvGePoint3d(0, 0, 0);
+ * blockRecord.appendEntity(new UvDbLine());
+ * ```
+ */
+export class UvDbBlockTableRecord extends UvDbSymbolTableRecord {
+  /** Name constant for model space block table record */
+  static MODEL_SPACE_NAME = '*MODEL_SPACE'
+  /** Name prefix for paper space block table records */
+  static PAPER_SPACE_NAME_PREFIX = '*PAPER_SPACE'
+
+  /** The base point of the block in WCS coordinates */
+  private _origin: UvGePoint3d
+  /** The object id of the associated UvDbLayout object in the Layouts dictionary.*/
+  private _layoutId: UvDbObjectId
+  /** Map of entities indexed by their object IDs */
+  private _entities: Map<UvDbObjectId, UvDbEntity>
+
+  /**
+   * Returns true if the specified name is the name of the model space block table record.
+   *
+   * Model space is the primary drawing area where most entities are created.
+   *
+   * @param name - The name of one block table record.
+   * @returns True if the specified name is the name of the model space block table record.
+   *
+   * @example
+   * ```typescript
+   * if (UvDbBlockTableRecord.isModelSpaceName('*Model_Space')) {
+   *   console.log('This is the name of the model space block table record.');
+   * }
+   * ```
+   */
+  static isModelSpaceName(name: string) {
+    return (
+      name.toLowerCase() == UvDbBlockTableRecord.MODEL_SPACE_NAME.toLowerCase()
+    )
+  }
+
+  /**
+   * @deprecated Use {@link isModelSpaceName} instead.
+   */
+  static isModelSapceName(name: string) {
+    return UvDbBlockTableRecord.isModelSpaceName(name)
+  }
+
+  /**
+   * Returns true if the specified name is the name of a paper space block table record.
+   *
+   * Paper space is used for creating layouts for printing and plotting.
+   *
+   * @param name - The name of one block table record.
+   * @returns True if the specified name is the name of a paper space block table record.
+   *
+   * @example
+   * ```typescript
+   * if (UvDbBlockTableRecord.isPaperSpaceName('*Paper_Space1')) {
+   *   console.log('This is the name of the paper space block table record.');
+   * }
+   * ```
+   */
+  static isPaperSpaceName(name: string) {
+    return name
+      .toLowerCase()
+      .startsWith(UvDbBlockTableRecord.PAPER_SPACE_NAME_PREFIX.toLowerCase())
+  }
+
+  /**
+   * @deprecated Use {@link isPaperSpaceName} instead.
+   */
+  static isPaperSapceName(name: string) {
+    return UvDbBlockTableRecord.isPaperSpaceName(name)
+  }
+
+  /**
+   * Creates a new UvDbBlockTableRecord instance.
+   *
+   * @example
+   * ```typescript
+   * const blockRecord = new UvDbBlockTableRecord();
+   * ```
+   */
+  constructor() {
+    super()
+    this._origin = new UvGePoint3d()
+    this._layoutId = ''
+    this._entities = new Map<string, UvDbEntity>()
+  }
+
+  /**
+   * Returns true if this is a model space block table record.
+   *
+   * Model space is the primary drawing area where most entities are created.
+   *
+   * @returns True if this is a model space block table record
+   *
+   * @example
+   * ```typescript
+   * if (blockRecord.isModelSpace) {
+   *   console.log('This is model space');
+   * }
+   * ```
+   */
+  get isModelSpace() {
+    return UvDbBlockTableRecord.isModelSpaceName(this.name)
+  }
+
+  /**
+   * @deprecated Use {@link isModelSpace} instead.
+   */
+  get isModelSapce() {
+    return this.isModelSpace
+  }
+
+  /**
+   * Returns true if this is a paper space block table record.
+   *
+   * Paper space is used for creating layouts for printing and plotting.
+   *
+   * @returns True if this is a paper space block table record
+   *
+   * @example
+   * ```typescript
+   * if (blockRecord.isPaperSpace) {
+   *   console.log('This is paper space');
+   * }
+   * ```
+   */
+  get isPaperSpace() {
+    return UvDbBlockTableRecord.isPaperSpaceName(this.name)
+  }
+
+  /**
+   * @deprecated Use {@link isPaperSpace} instead.
+   */
+  get isPaperSapce() {
+    return this.isPaperSpace
+  }
+
+  /**
+   * Gets or sets the base point of the block in WCS coordinates.
+   *
+   * This point is the origin of the MCS (Model Coordinate System), which is the
+   * local WCS for the entities within the block table record.
+   *
+   * @returns The origin point of the block
+   *
+   * @example
+   * ```typescript
+   * const origin = blockRecord.origin;
+   * blockRecord.origin = new UvGePoint3d(10, 20, 0);
+   * ```
+   */
+  get origin() {
+    return this._origin
+  }
+  set origin(value: UvGePoint3d) {
+    this._origin.copy(value)
+  }
+
+  /**
+   * Gets or sets the object ID of the associated UvDbLayout object in the Layouts dictionary.
+   *
+   * This property links the block table record to its corresponding layout object,
+   * which defines the viewport configuration and display settings for the block.
+   * For model space blocks, this is typically empty, while paper space blocks
+   * have a corresponding layout ID.
+   *
+   * @returns The object ID of the associated layout
+   *
+   * @example
+   * ```typescript
+   * const layoutId = blockRecord.layoutId;
+   * blockRecord.layoutId = 'some-layout-object-id';
+   * ```
+   */
+  get layoutId() {
+    return this._layoutId
+  }
+  set layoutId(value: UvDbObjectId) {
+    this._layoutId = value
+  }
+
+  /**
+   * Appends the specified entity or entities to this block table record.
+   *
+   * This method adds an entity to the block and sets up the necessary
+   * relationships between the entity and the block table record.
+   *
+   * @param entity - The entity or entities to append to this block table record
+   *
+   * @example
+   * ```typescript
+   * const line = new UvDbLine();
+   * blockRecord.appendEntity(line);
+   * ```
+   */
+  appendEntity(entity: UvDbEntity | UvDbEntity[]) {
+    if (Array.isArray(entity)) {
+      for (let i = 0; i < entity.length; ++i) {
+        const item = entity[i]
+        item.database = this.database
+        item.ownerId = this.objectId
+        item.resolveEffectiveProperties()
+        this._entities.set(item.objectId, item)
+      }
+    } else {
+      entity.database = this.database
+      entity.ownerId = this.objectId
+      entity.resolveEffectiveProperties()
+      this._entities.set(entity.objectId, entity)
+    }
+
+    // When creating one block, it will also go to this function. But we don't want `entityAppended` event
+    // triggered in this case. So check whether the block name is name of the model space.
+    if (this.isModelSpace || this.isPaperSpace) {
+      this.database.events.entityAppended.dispatch({
+        database: this.database,
+        entity: entity
+      })
+    }
+  }
+
+  /**
+   * Removes the specified entity or entities from this block table record.
+   *
+   * Notes:
+   * Please call method UvDbEntity.erase to remove one entity instead of calling
+   * this function.
+   *
+   * AutoCAD ObjectARX API doesn't provide such one method to remove entities
+   * from the block table record. I guess it is done by friend class or function
+   * feature in C++. However, there are no similar feature in TypeScript. So
+   * we have to expose such one public method in UvDbBlockTableRecord.
+   *
+   * @param objectId - The object id or ids of entities to remove from this block table record
+   * @returns — true if an entity in the block table record existed and has been removed,
+   * or false if the entity does not exist.
+   */
+  removeEntity(objectId: UvDbObjectId | UvDbObjectId[]) {
+    const ids = Array.isArray(objectId) ? objectId : [objectId]
+    const entities: UvDbEntity[] = []
+    ids.forEach(id => {
+      const entity = this._entities.get(id)
+      if (entity) {
+        entities.push(entity)
+      }
+      this._entities.delete(id)
+    })
+    if (entities.length > 0) {
+      this.database.events.entityErased.dispatch({
+        database: this.database,
+        entity: entities
+      })
+    }
+    return entities.length > 0
+  }
+
+  /**
+   * Creates an iterator object that can be used to iterate over the entities in the block table record.
+   *
+   * @returns An iterator object that can be used to iterate over the entities
+   *
+   * @example
+   * ```typescript
+   * const iterator = blockRecord.newIterator();
+   * for (const entity of iterator) {
+   *   console.log('Entity:', entity.type);
+   * }
+   * ```
+   */
+  newIterator(): UvDbObjectIterator<UvDbEntity> {
+    return new UvDbObjectIterator(this._entities)
+  }
+
+  /**
+   * Searches for an entity in this block table record with the specified ID.
+   *
+   * @param id - The entity ID to search for
+   * @returns The entity with the specified ID, or undefined if not found
+   */
+  getIdAt(id: UvDbObjectId) {
+    return this._entities.get(id)
+  }
+}

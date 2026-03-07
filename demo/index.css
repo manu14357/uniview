@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --uv-bg-primary: #ffffff;
+  --uv-bg-secondary: #f9fafb;
+  --uv-text-primary: #111827;
+  --uv-text-secondary: #6b7280;
+  --uv-border: #e5e7eb;
+  --uv-accent: #3b82f6;
+}
+
+.dark {
+  --uv-bg-primary: #111827;
+  --uv-bg-secondary: #1f2937;
+  --uv-text-primary: #f9fafb;
+  --uv-text-secondary: #9ca3af;
+  --uv-border: #374151;
+  --uv-accent: #60a5fa;
+}

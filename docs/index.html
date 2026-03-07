@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UniView — Document & CAD Viewer for React</title>
+  <meta name="description" content="Open-source React library to view PDFs, DOCX, XLSX, DWG, DXF, images and more in the browser. No backend needed." />
+  <meta name="theme-color" content="#2563eb" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3C/svg%3E" />
+  <style>
+    :root {
+      --blue-50: #eff6ff; --blue-100: #dbeafe; --blue-200: #bfdbfe;
+      --blue-500: #3b82f6; --blue-600: #2563eb; --blue-700: #1d4ed8;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+      --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937;
+      --gray-900: #111827; --gray-950: #030712;
+      --orange-500: #f97316; --red-500: #ef4444; --green-500: #22c55e;
+      --purple-500: #a855f7;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      color: var(--gray-800); background: #fff; line-height: 1.6;
+    }
+    a { color: var(--blue-600); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      font-family: 'SF Mono', SFMono-Regular, ui-monospace, 'DejaVu Sans Mono', Menlo, Consolas, monospace;
+      font-size: 0.875em; background: var(--gray-100); padding: 0.15em 0.4em; border-radius: 4px;
+    }
+    pre {
+      background: var(--gray-900); color: #e2e8f0; padding: 1.25rem; border-radius: 8px;
+      overflow-x: auto; font-size: 0.875rem; line-height: 1.7; margin: 1rem 0;
+    }
+    pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+
+    /* NAV */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(255,255,255,0.85); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--gray-200); height: 64px;
+    }
+    .nav-inner {
+      max-width: 1200px; margin: 0 auto; padding: 0 1.5rem;
+      display: flex; align-items: center; justify-content: space-between; height: 100%;
+    }
+    .nav-logo { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 1.125rem; color: var(--gray-900); }
+    .nav-logo-icon {
+      width: 32px; height: 32px; background: var(--blue-600); border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .nav-links { display: flex; gap: 2rem; align-items: center; }
+    .nav-links a { color: var(--gray-600); font-size: 0.875rem; font-weight: 500; text-decoration: none; }
+    .nav-links a:hover { color: var(--gray-900); }
+    .nav-links .btn-gh {
+      background: var(--gray-900); color: #fff; padding: 0.5rem 1rem;
+      border-radius: 8px; font-size: 0.8125rem; font-weight: 600;
+    }
+    .nav-links .btn-gh:hover { background: var(--gray-700); text-decoration: none; }
+
+    /* HERO */
+    .hero {
+      padding: 8rem 1.5rem 5rem; text-align: center;
+      background: linear-gradient(180deg, var(--blue-50) 0%, #fff 100%);
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: var(--blue-100); color: var(--blue-700);
+      padding: 0.375rem 1rem; border-radius: 999px; font-size: 0.8125rem; font-weight: 600;
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 { font-size: 3.5rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; color: var(--gray-900); }
+    .hero h1 span { background: linear-gradient(135deg, var(--blue-600), var(--purple-500)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p { font-size: 1.25rem; color: var(--gray-500); max-width: 640px; margin: 1.5rem auto 0; }
+    .hero-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 2.5rem; flex-wrap: wrap; }
+    .btn-primary {
+      background: var(--blue-600); color: #fff; padding: 0.75rem 2rem;
+      border-radius: 10px; font-weight: 600; font-size: 1rem; border: none; cursor: pointer;
+    }
+    .btn-primary:hover { background: var(--blue-700); text-decoration: none; }
+    .btn-secondary {
+      background: #fff; color: var(--gray-700); padding: 0.75rem 2rem;
+      border-radius: 10px; font-weight: 600; font-size: 1rem; border: 1px solid var(--gray-300); cursor: pointer;
+    }
+    .btn-secondary:hover { background: var(--gray-50); text-decoration: none; }
+    .hero-install {
+      margin-top: 2rem; display: inline-flex; align-items: center; gap: 0.75rem;
+      background: var(--gray-900); color: #a5b4fc; padding: 0.75rem 1.5rem;
+      border-radius: 10px; font-family: monospace; font-size: 0.9375rem;
+    }
+    .hero-install .dollar { color: var(--gray-500); }
+
+    /* FORMAT BADGES */
+    .formats { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-top: 2.5rem; }
+    .format-badge {
+      padding: 0.375rem 0.875rem; border-radius: 999px; font-size: 0.75rem;
+      font-weight: 700; border: 1px solid; letter-spacing: 0.02em;
+    }
+    .fmt-cad { background: #fff7ed; color: var(--orange-500); border-color: #fed7aa; }
+    .fmt-doc { background: #fef2f2; color: var(--red-500); border-color: #fecaca; }
+    .fmt-sheet { background: #f0fdf4; color: var(--green-500); border-color: #bbf7d0; }
+    .fmt-img { background: #faf5ff; color: var(--purple-500); border-color: #e9d5ff; }
+    .fmt-text { background: var(--gray-50); color: var(--gray-500); border-color: var(--gray-200); }
+
+    /* SECTIONS */
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+    section { padding: 5rem 0; }
+    section:nth-child(even) { background: var(--gray-50); }
+    .section-title { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; text-align: center; color: var(--gray-900); }
+    .section-sub { font-size: 1.125rem; color: var(--gray-500); text-align: center; max-width: 600px; margin: 0.75rem auto 0; }
+
+    /* FEATURES GRID */
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 3rem; }
+    .feature-card {
+      background: #fff; border: 1px solid var(--gray-200); border-radius: 12px;
+      padding: 1.75rem; transition: box-shadow 0.2s;
+    }
+    .feature-card:hover { box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+    .feature-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.25rem; margin-bottom: 1rem;
+    }
+    .feature-card h3 { font-size: 1.0625rem; font-weight: 700; color: var(--gray-900); margin-bottom: 0.5rem; }
+    .feature-card p { font-size: 0.9375rem; color: var(--gray-500); line-height: 1.6; }
+
+    /* API TABLE */
+    .api-table { width: 100%; border-collapse: collapse; margin-top: 2rem; font-size: 0.9375rem; }
+    .api-table th { text-align: left; padding: 0.75rem 1rem; background: var(--gray-100); font-weight: 600; color: var(--gray-700); border-bottom: 2px solid var(--gray-200); }
+    .api-table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--gray-100); vertical-align: top; }
+    .api-table td:first-child { font-weight: 600; color: var(--blue-600); font-family: monospace; white-space: nowrap; }
+    .api-table td:nth-child(2) { font-family: monospace; color: var(--gray-600); white-space: nowrap; }
+    .api-table td:nth-child(3) { color: var(--gray-500); }
+
+    /* FOOTER */
+    footer {
+      padding: 3rem 1.5rem; text-align: center; border-top: 1px solid var(--gray-200);
+      color: var(--gray-400); font-size: 0.875rem;
+    }
+    footer a { color: var(--gray-500); }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 2.25rem; }
+      .hero p { font-size: 1.0625rem; }
+      .nav-links a:not(.btn-gh) { display: none; }
+      .features-grid { grid-template-columns: 1fr; }
+      .api-table { font-size: 0.8125rem; }
+    }
+
+    /* TOC sidebar for docs */
+    .docs-layout { display: flex; gap: 3rem; margin-top: 3rem; }
+    .docs-toc {
+      position: sticky; top: 80px; width: 220px; flex-shrink: 0;
+      max-height: calc(100vh - 100px); overflow-y: auto; font-size: 0.8125rem;
+    }
+    .docs-toc ul { list-style: none; }
+    .docs-toc li { margin-bottom: 0.5rem; }
+    .docs-toc a { color: var(--gray-500); font-weight: 500; }
+    .docs-toc a:hover { color: var(--blue-600); text-decoration: none; }
+    .docs-toc .toc-h3 { padding-left: 1rem; }
+    .docs-content { flex: 1; min-width: 0; }
+    .docs-content h2 { font-size: 1.5rem; font-weight: 800; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--gray-200); color: var(--gray-900); }
+    .docs-content h2:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+    .docs-content h3 { font-size: 1.125rem; font-weight: 700; margin-top: 2rem; color: var(--gray-800); }
+    .docs-content p { margin-top: 0.75rem; color: var(--gray-600); }
+    .docs-content ul { margin-top: 0.75rem; padding-left: 1.5rem; color: var(--gray-600); }
+    .docs-content li { margin-bottom: 0.35rem; }
+
+    @media (max-width: 900px) {
+      .docs-toc { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="nav-logo" style="text-decoration:none">
+      <div class="nav-logo-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      </div>
+      UniView
+    </a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#formats">Formats</a>
+      <a href="#docs">Docs</a>
+      <a href="#api">API</a>
+      <a href="./demo/" target="_blank">Live Demo</a>
+      <a href="https://github.com/manu14357/uniview" class="btn-gh" target="_blank">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    v1.0.0 — Open Source
+  </div>
+  <h1>View Any File<br/>in the <span>Browser</span></h1>
+  <p>
+    Open-source React library to view PDFs, DOCX, XLSX,
+    DWG, DXF, images and more — no backend needed.
+  </p>
+  <div class="hero-actions">
+    <a href="#docs" class="btn-primary">Get Started</a>
+    <a href="./demo/" target="_blank" class="btn-secondary">Live Demo →</a>
+  </div>
+  <div class="hero-install">
+    <span class="dollar">$</span> npm install uniview
+  </div>
+  <div class="formats">
+    <span class="format-badge fmt-cad">DWG</span>
+    <span class="format-badge fmt-cad">DXF</span>
+    <span class="format-badge fmt-doc">PDF</span>
+    <span class="format-badge fmt-doc">DOCX</span>
+    <span class="format-badge fmt-sheet">XLSX</span>
+    <span class="format-badge fmt-sheet">CSV</span>
+    <span class="format-badge fmt-img">PNG</span>
+    <span class="format-badge fmt-img">JPG</span>
+    <span class="format-badge fmt-img">SVG</span>
+    <span class="format-badge fmt-img">TIFF</span>
+    <span class="format-badge fmt-img">WebP</span>
+    <span class="format-badge fmt-text">TXT</span>
+    <span class="format-badge fmt-text">RTF</span>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="container">
+    <h2 class="section-title">Why UniView?</h2>
+    <p class="section-sub">Everything you need only a <code>&lt;UniView /&gt;</code> away.</p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#eff6ff;color:var(--blue-600)">🧩</div>
+        <h3>Plugin Architecture</h3>
+        <p>Decoupled renderer plugins — each format loads only when needed. Extend with your own custom renderers via the PluginSystem API.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#faf5ff;color:var(--purple-500)">⚡</div>
+        <h3>GPU-Accelerated CAD</h3>
+        <p>DWG and DXF files render via Three.js WebGL with geometry batching, instanced rendering, and smooth pan/zoom controls.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#f0fdf4;color:var(--green-500)">🧵</div>
+        <h3>Web Workers & WASM</h3>
+        <p>All file parsing runs off the main thread. DWG uses WebAssembly (libredwg-web). Your UI never freezes.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#fff7ed;color:var(--orange-500)">📄</div>
+        <h3>Virtual Rendering</h3>
+        <p>PDF pages load on demand via IntersectionObserver. XLSX uses virtual row rendering. Handles thousands of pages/rows effortlessly.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#fef2f2;color:var(--red-500)">🎨</div>
+        <h3>Annotations &amp; Markup</h3>
+        <p>Built-in SVG annotation layer with pen, highlight, arrow, rectangle, and text tools. Export annotations as JSON.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#eff6ff;color:var(--blue-600)">🌙</div>
+        <h3>Dark Mode &amp; Theming</h3>
+        <p>Light, dark, and auto (OS preference) themes out of the box. CSS custom properties for full customization.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#faf5ff;color:var(--purple-500)">📦</div>
+        <h3>Tiny Footprint</h3>
+        <p>Tree-shakeable ESM + CJS dual output. Only import what you use. Formats you don't need are never downloaded.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#f0fdf4;color:var(--green-500)">🔑</div>
+        <h3>Full TypeScript</h3>
+        <p>Built with strict TypeScript. Complete type definitions shipped in the package. IntelliSense for every prop and hook.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#fff7ed;color:var(--orange-500)">🚫</div>
+        <h3>Zero Backend</h3>
+        <p>Everything runs in the browser. No server, no API keys, no upload required. Works offline after first load.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FORMATS -->
+<section id="formats" style="background:var(--gray-50)">
+  <div class="container">
+    <h2 class="section-title">17 Formats Supported</h2>
+    <p class="section-sub">One component, every file type. Each format has a dedicated rendering engine.</p>
+    <table class="api-table" style="margin-top:2.5rem">
+      <thead><tr><th>Category</th><th>Formats</th><th>Engine</th></tr></thead>
+      <tbody>
+        <tr><td style="color:var(--orange-500)">CAD Drawings</td><td>DWG, DXF</td><td>Three.js WebGL + libredwg-web (WASM)</td></tr>
+        <tr><td style="color:var(--red-500)">Documents</td><td>PDF</td><td>Mozilla PDF.js (canvas rendering)</td></tr>
+        <tr><td style="color:var(--blue-600)">Documents</td><td>DOCX, DOC</td><td>mammoth.js (DOCX → HTML)</td></tr>
+        <tr><td style="color:var(--green-500)">Spreadsheets</td><td>XLSX, XLS, CSV</td><td>SheetJS (virtual table rendering)</td></tr>
+        <tr><td style="color:var(--purple-500)">Images</td><td>PNG, JPG, JPEG, WebP, BMP, TIFF</td><td>HTML5 Canvas</td></tr>
+        <tr><td style="color:var(--purple-500)">Images</td><td>SVG</td><td>Inline SVG with zoom/pan</td></tr>
+        <tr><td style="color:var(--gray-500)">Text</td><td>TXT, RTF</td><td>Monospace renderer with line numbers</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- DOCS -->
+<section id="docs">
+  <div class="container">
+    <h2 class="section-title">Documentation</h2>
+    <p class="section-sub">Everything you need to integrate UniView into your React application.</p>
+
+    <div class="docs-layout">
+      <aside class="docs-toc">
+        <ul>
+          <li><a href="#install">Installation</a></li>
+          <li><a href="#quick-start">Quick Start</a></li>
+          <li><a href="#props-ref">Props Reference</a></li>
+          <li><a href="#hooks-ref">Hooks</a></li>
+          <li class="toc-h3"><a href="#hook-useviewer">useViewer</a></li>
+          <li class="toc-h3"><a href="#hook-usezoom">useZoom</a></li>
+          <li class="toc-h3"><a href="#hook-usepan">usePan</a></li>
+          <li class="toc-h3"><a href="#hook-usefileloader">useFileLoader</a></li>
+          <li class="toc-h3"><a href="#hook-useannotations">useAnnotations</a></li>
+          <li><a href="#theming">Theming</a></li>
+          <li><a href="#cad-features">CAD Features</a></li>
+          <li><a href="#annotations-doc">Annotations</a></li>
+          <li><a href="#plugins">Plugin System</a></li>
+          <li><a href="#types-ref">Types Reference</a></li>
+        </ul>
+      </aside>
+
+      <div class="docs-content">
+
+        <h2 id="install">Installation</h2>
+        <pre><code>npm install uniview</code></pre>
+        <p><strong>Peer dependencies:</strong> React 18+ and React-DOM 18+.</p>
+        <pre><code>npm install react react-dom</code></pre>
+
+        <h2 id="quick-start">Quick Start</h2>
+        <h3>Minimal — just pass a file</h3>
+<pre><code>import { UniView } from 'uniview';
+
+function App() {
+  return &lt;UniView file="./drawing.dxf" /&gt;;
+}</code></pre>
+
+        <h3>Full configuration</h3>
+<pre><code>import { UniView } from 'uniview';
+import type { DocumentInfo, ViewerError } from 'uniview';
+
+function Viewer({ file }: { file: File }) {
+  return (
+    &lt;UniView
+      file={file}
+      theme="dark"
+      layout="continuous"
+      toolbar={true}
+      sidebar={true}
+      annotations={true}
+      initialPage={1}
+      initialZoom="fit"
+      onLoad={(info: DocumentInfo) =&gt; console.log('Loaded:', info)}
+      onError={(err: ViewerError) =&gt; console.error(err.message)}
+      onPageChange={(page) =&gt; console.log('Page:', page)}
+      onZoomChange={(zoom) =&gt; console.log('Zoom:', zoom)}
+    /&gt;
+  );
+}</code></pre>
+
+        <h3>Loading from URL</h3>
+<pre><code>&lt;UniView file="https://example.com/report.pdf" theme="light" /&gt;</code></pre>
+
+        <h3>Loading from ArrayBuffer</h3>
+<pre><code>const response = await fetch('/data/plan.dwg');
+const buffer = await response.arrayBuffer();
+&lt;UniView file={buffer} format="dwg" /&gt;</code></pre>
+
+        <h2 id="props-ref">Props Reference</h2>
+        <table class="api-table">
+          <thead><tr><th>Prop</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>file</td><td>File | string | ArrayBuffer</td><td><strong>Required.</strong> File object, URL, or raw bytes.</td></tr>
+            <tr><td>format</td><td>SupportedFormat</td><td>Auto-detected from extension/MIME if omitted.</td></tr>
+            <tr><td>theme</td><td>'light' | 'dark' | 'auto'</td><td>Visual theme. Default: <code>'light'</code></td></tr>
+            <tr><td>layout</td><td>'single' | 'continuous' | 'facing'</td><td>Page layout mode. Default: <code>'continuous'</code></td></tr>
+            <tr><td>toolbar</td><td>boolean</td><td>Show/hide toolbar. Default: <code>true</code></td></tr>
+            <tr><td>sidebar</td><td>boolean</td><td>Show/hide sidebar. Default: <code>true</code></td></tr>
+            <tr><td>annotations</td><td>boolean</td><td>Enable annotation tools. Default: <code>false</code></td></tr>
+            <tr><td>initialPage</td><td>number</td><td>Starting page (1-indexed). Default: <code>1</code></td></tr>
+            <tr><td>initialZoom</td><td>number | 'fit' | 'width'</td><td>Starting zoom level. Default: <code>1</code></td></tr>
+            <tr><td>onLoad</td><td>(info: DocumentInfo) => void</td><td>Fires when document is loaded.</td></tr>
+            <tr><td>onError</td><td>(error: ViewerError) => void</td><td>Fires on any error.</td></tr>
+            <tr><td>onPageChange</td><td>(page: number) => void</td><td>Fires on page change.</td></tr>
+            <tr><td>onZoomChange</td><td>(zoom: number) => void</td><td>Fires on zoom change.</td></tr>
+            <tr><td>className</td><td>string</td><td>Custom CSS class on root element.</td></tr>
+            <tr><td>style</td><td>CSSProperties</td><td>Custom inline styles.</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="hooks-ref">Hooks</h2>
+        <p>UniView provides hooks for headless integration and programmatic control.</p>
+
+        <h3 id="hook-useviewer">useViewer()</h3>
+        <p>Main control hook — combines page navigation, zoom, layers, and sidebar.</p>
+<pre><code>import { useViewer } from 'uniview';
+
+function Controls() {
+  const {
+    format, fileName, currentPage, totalPages, zoom,
+    sidebarOpen,
+    goToPage, nextPage, prevPage,
+    setZoom, zoomIn, zoomOut, fitWidth, fitPage,
+    toggleLayer, toggleSidebar,
+  } = useViewer();
+
+  return (
+    &lt;div&gt;
+      &lt;span&gt;{currentPage} / {totalPages}&lt;/span&gt;
+      &lt;button onClick={prevPage}&gt;Prev&lt;/button&gt;
+      &lt;button onClick={nextPage}&gt;Next&lt;/button&gt;
+      &lt;button onClick={zoomIn}&gt;Zoom In&lt;/button&gt;
+      &lt;button onClick={zoomOut}&gt;Zoom Out&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+        <h3 id="hook-usezoom">useZoom()</h3>
+        <p>Dedicated zoom management. Min: 0.1, Max: 10, Step: 1.25×.</p>
+<pre><code>import { useZoom } from 'uniview';
+
+const { zoom, setZoom, zoomIn, zoomOut, zoomTo, resetZoom, fitWidth, fitPage } = useZoom();</code></pre>
+
+        <h3 id="hook-usepan">usePan()</h3>
+        <p>Pan/drag state management with inertia (friction: 0.95).</p>
+<pre><code>import { usePan } from 'uniview';
+
+const { pan, panHandlers, resetPan } = usePan();
+// pan = { x, y, isDragging }
+// panHandlers = { onMouseDown, onMouseMove, onMouseUp }</code></pre>
+
+        <h3 id="hook-usefileloader">useFileLoader()</h3>
+        <p>File loading with progress tracking.</p>
+<pre><code>import { useFileLoader } from 'uniview';
+
+const { state, loadFile } = useFileLoader();
+// state = { isLoading, progress, fileData, fileName, format, error }
+
+// Load a file
+await loadFile(myFile);
+await loadFile('https://example.com/doc.pdf');</code></pre>
+
+        <h3 id="hook-useannotations">useAnnotations()</h3>
+        <p>Annotation CRUD operations.</p>
+<pre><code>import { useAnnotations } from 'uniview';
+
+const {
+  annotations,    // Annotation[] for current page
+  activeTool,     // 'select' | 'pen' | 'highlight' | 'arrow' | 'rectangle' | 'text'
+  activeColor,    // hex color
+  activeLineWidth,
+  isAnnotating,
+  setTool, setColor, setLineWidth,
+  addAnnotation, removeAnnotation, clearAnnotations,
+  exportAsJSON,   // () => string
+} = useAnnotations();</code></pre>
+
+        <h2 id="theming">Theming</h2>
+        <p>UniView supports three theme modes:</p>
+        <ul>
+          <li><code>'light'</code> — Light background, dark text</li>
+          <li><code>'dark'</code> — Dark background, light text</li>
+          <li><code>'auto'</code> — Follows the OS <code>prefers-color-scheme</code> setting</li>
+        </ul>
+<pre><code>&lt;UniView file={file} theme="dark" /&gt;</code></pre>
+        <p>All colors use CSS custom properties for easy overriding in your own stylesheets.</p>
+
+        <h2 id="cad-features">CAD Features</h2>
+        <p>DWG and DXF files have dedicated features:</p>
+        <ul>
+          <li><strong>WebGL Rendering</strong> — Three.js GPU-accelerated rendering with geometry batching</li>
+          <li><strong>Layer Control</strong> — Show/hide layers, toggle visibility</li>
+          <li><strong>Zoom</strong> — Scroll-wheel zoom (1.3× steps), fit-to-drawing</li>
+          <li><strong>Pan</strong> — Space+drag or middle-click drag</li>
+          <li><strong>Coordinates</strong> — Live cursor position in world coordinates</li>
+          <li><strong>Keyboard Shortcuts</strong> — +/- zoom, F fit, V select mode, H pan mode</li>
+        </ul>
+
+        <h3>Layer control via hook</h3>
+<pre><code>import { useLayerStore } from 'uniview';
+
+const layers = useLayerStore(s => s.layers);
+const toggleLayer = useLayerStore(s => s.toggleLayer);
+
+layers.forEach(layer => {
+  console.log(layer.name, layer.visible, layer.color);
+});
+
+toggleLayer('layer-id'); // Toggle visibility</code></pre>
+
+        <h2 id="annotations-doc">Annotations</h2>
+        <p>Enable annotation mode by setting <code>annotations={true}</code>:</p>
+<pre><code>&lt;UniView file={file} annotations={true} /&gt;</code></pre>
+        <p>Available tools:</p>
+        <ul>
+          <li><strong>Select</strong> — Click to move/resize existing annotations</li>
+          <li><strong>Pen</strong> — Freehand drawing</li>
+          <li><strong>Highlight</strong> — Semi-transparent marker</li>
+          <li><strong>Arrow</strong> — Directional arrow</li>
+          <li><strong>Rectangle</strong> — Bounding box</li>
+          <li><strong>Text</strong> — Click to place text note</li>
+        </ul>
+        <p>Export annotations:</p>
+<pre><code>import { useAnnotations } from 'uniview';
+
+const { exportAsJSON } = useAnnotations();
+const json = exportAsJSON(); // JSON string of all annotations</code></pre>
+
+        <h2 id="plugins">Plugin System</h2>
+        <p>Extend UniView with custom renderers for any file format:</p>
+<pre><code>import { PluginSystem } from 'uniview';
+
+PluginSystem.register({
+  name: 'my-ifc-viewer',
+  version: '1.0.0',
+  supportedFormats: ['ifc'],
+  render: async (container, file, options) => {
+    // Render your custom format here
+    const viewer = initMyViewer(container, file);
+    return {
+      destroy: () => viewer.dispose(),
+      goToPage: (page) => viewer.goTo(page),
+      setZoom: (zoom) => viewer.zoom(zoom),
+      getInfo: () => ({ /* DocumentInfo */ }),
+    };
+  },
+});</code></pre>
+
+        <h2 id="types-ref">Types Reference</h2>
+        <h3>SupportedFormat</h3>
+<pre><code>type SupportedFormat =
+  | 'pdf' | 'docx' | 'doc'
+  | 'xlsx' | 'xls' | 'csv'
+  | 'dxf' | 'dwg'
+  | 'png' | 'jpg' | 'jpeg' | 'svg' | 'tiff' | 'bmp' | 'webp'
+  | 'txt' | 'rtf';</code></pre>
+
+        <h3>DocumentInfo</h3>
+<pre><code>interface DocumentInfo {
+  format: SupportedFormat;
+  fileName: string;
+  fileSize: number;
+  pageCount: number;
+  title?: string;
+  author?: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+  layers?: CADLayer[];   // DWG/DXF only
+  sheets?: string[];     // XLSX only
+}</code></pre>
+
+        <h3>CADLayer</h3>
+<pre><code>interface CADLayer {
+  id: string;
+  name: string;
+  color: string;       // Hex e.g. '#FF0000'
+  visible: boolean;
+  locked: boolean;
+  lineType?: string;
+  lineWeight?: number;
+}</code></pre>
+
+        <h3>ViewerError</h3>
+<pre><code>interface ViewerError {
+  code: string;
+  message: string;
+  format?: SupportedFormat;
+  originalError?: Error;
+}</code></pre>
+
+        <h3>Annotation</h3>
+<pre><code>interface Annotation {
+  id: string;
+  tool: 'select' | 'pen' | 'highlight' | 'arrow' | 'rectangle' | 'text';
+  color: string;
+  lineWidth: number;
+  pageNumber: number;
+  data: AnnotationPathData | AnnotationShapeData | AnnotationTextData;
+  createdAt: Date;
+}</code></pre>
+
+        <h3>UniViewPlugin</h3>
+<pre><code>interface UniViewPlugin {
+  name: string;
+  version: string;
+  supportedFormats: SupportedFormat[];
+  render: (
+    container: HTMLElement,
+    file: ArrayBuffer,
+    options: PluginOptions,
+  ) => Promise&lt;PluginInstance&gt;;
+}</code></pre>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- API SUMMARY -->
+<section id="api" style="background:var(--gray-50)">
+  <div class="container">
+    <h2 class="section-title">Exports at a Glance</h2>
+    <p class="section-sub">Everything exported from <code>import { ... } from 'uniview'</code></p>
+    <table class="api-table">
+      <thead><tr><th>Export</th><th>Kind</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>UniView</td><td>Component</td><td>Main viewer component — handles all formats</td></tr>
+        <tr><td>useViewer</td><td>Hook</td><td>Page nav, zoom, layers, sidebar control</td></tr>
+        <tr><td>useZoom</td><td>Hook</td><td>Zoom in/out/fit/reset</td></tr>
+        <tr><td>usePan</td><td>Hook</td><td>Pan/drag with inertia</td></tr>
+        <tr><td>useFileLoader</td><td>Hook</td><td>File loading + progress tracking</td></tr>
+        <tr><td>useAnnotations</td><td>Hook</td><td>Annotation CRUD + export</td></tr>
+        <tr><td>useKeyboardShortcuts</td><td>Hook</td><td>Register global keyboard shortcuts</td></tr>
+        <tr><td>EventBus</td><td>Class</td><td>Type-safe pub/sub event system</td></tr>
+        <tr><td>PluginSystem</td><td>Class</td><td>Custom renderer registration</td></tr>
+        <tr><td>detectFormat</td><td>Function</td><td>Detect file format from name/MIME</td></tr>
+        <tr><td>exportToImage</td><td>Function</td><td>Export current view as PNG</td></tr>
+        <tr><td>exportToPDF</td><td>Function</td><td>Export current view as PDF</td></tr>
+        <tr><td>useViewerStore</td><td>Store</td><td>Zustand store for viewer state</td></tr>
+        <tr><td>useAnnotationStore</td><td>Store</td><td>Zustand store for annotations</td></tr>
+        <tr><td>useLayerStore</td><td>Store</td><td>Zustand store for CAD layers</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>
+    <strong>UniView</strong> is open source under the
+    <a href="https://github.com/manu14357/uniview/blob/main/LICENSE">MIT License</a>.
+    Built by <a href="https://github.com/manu14357">Manu</a>.
+  </p>
+  <p style="margin-top:0.5rem">
+    <a href="https://github.com/manu14357/uniview">GitHub</a> &nbsp;·&nbsp;
+    <a href="https://www.npmjs.com/package/uniview">NPM</a> &nbsp;·&nbsp;
+    <a href="./demo/">Live Demo</a>
+  </p>
+</footer>
+
+</body>
+</html>

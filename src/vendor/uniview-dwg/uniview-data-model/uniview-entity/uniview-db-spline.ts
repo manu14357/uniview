@@ -1,0 +1,224 @@
+import { UvCmErrors } from '@uniview/common'
+import {
+  UvGeKnotParameterizationType,
+  UvGePoint3dLike,
+  UvGeSpline3d
+} from '@uniview/geometry'
+import { UvGiRenderer } from '@uniview/graphics'
+
+import { UvDbOsnapMode } from '../uniview-misc'
+import { UvDbCurve } from './uniview-db-curve'
+
+/**
+ * Represents a spline entity in AutoCAD.
+ *
+ * A spline is a 3D geometric object defined by control points or fit points.
+ * Splines are smooth curves that can be used to create complex curved shapes
+ * in drawings. They can be either open or closed curves.
+ *
+ * @example
+ * ```typescript
+ * // Create a spline from control points
+ * const controlPoints = [
+ *   new UvGePoint3d(0, 0, 0),
+ *   new UvGePoint3d(5, 5, 0),
+ *   new UvGePoint3d(10, 0, 0)
+ * ];
+ * const knots = [0, 0, 0, 1, 1, 1];
+ * const spline = new UvDbSpline(controlPoints, knots);
+ *
+ * // Create a spline from fit points
+ * const fitPoints = [
+ *   new UvGePoint3d(0, 0, 0),
+ *   new UvGePoint3d(5, 5, 0),
+ *   new UvGePoint3d(10, 0, 0)
+ * ];
+ * const spline2 = new UvDbSpline(fitPoints, UvGeKnotParameterizationType.Uniform);
+ * ```
+ */
+export class UvDbSpline extends UvDbCurve {
+  /** The entity type name */
+  static override typeName: string = 'Spline'
+
+  /** The underlying geometric spline object */
+  private _geo: UvGeSpline3d
+
+  /**
+   * Creates a new spline entity from control points.
+   *
+   * This constructor creates a spline using the specified control points, knots,
+   * and optional weights. The control points must be in World Coordinate System (WCS) coordinates.
+   *
+   * @param controlPoints - Array of control points in WCS coordinates
+   * @param knots - Array of knot values that define the spline's parameterization
+   * @param weights - Optional array of weights for each control point (default: 1 for all)
+   * @param degree - Optional degree of the spline (default: 3)
+   * @param closed - Whether the spline should be closed (default: false)
+   *
+   * @example
+   * ```typescript
+   * const controlPoints = [
+   *   new UvGePoint3d(0, 0, 0),
+   *   new UvGePoint3d(5, 5, 0),
+   *   new UvGePoint3d(10, 0, 0)
+   * ];
+   * const knots = [0, 0, 0, 1, 1, 1];
+   * const spline = new UvDbSpline(controlPoints, knots);
+   * ```
+   */
+  constructor(
+    controlPoints: UvGePoint3dLike[],
+    knots: number[],
+    weights?: number[],
+    degree?: number,
+    closed?: boolean
+  )
+  /**
+   * Creates a new spline entity from fit points.
+   *
+   * This constructor creates a spline that passes through the specified fit points.
+   * The fit points must be in World Coordinate System (WCS) coordinates.
+   *
+   * @param fitPoints - Array of fit points in WCS coordinates
+   * @param knotParam - Knot parameterization type that defines how knots are generated
+   * @param degree - Optional degree of the spline (default: 3)
+   * @param closed - Whether the spline should be closed (default: false)
+   *
+   * @example
+   * ```typescript
+   * const fitPoints = [
+   *   new UvGePoint3d(0, 0, 0),
+   *   new UvGePoint3d(5, 5, 0),
+   *   new UvGePoint3d(10, 0, 0)
+   * ];
+   * const spline = new UvDbSpline(fitPoints, UvGeKnotParameterizationType.Uniform);
+   * ```
+   */
+  constructor(
+    fitPoints: UvGePoint3dLike[],
+    knotParam: UvGeKnotParameterizationType,
+    degree?: number,
+    closed?: boolean
+  )
+  constructor(a?: unknown, b?: unknown, c?: unknown, d?: unknown, e?: unknown) {
+    super()
+    const argsLength =
+      +(a !== undefined) +
+      +(b !== undefined) +
+      +(c !== undefined) +
+      +(d !== undefined) +
+      +(e !== undefined)
+
+    if (argsLength < 2 || argsLength > 5) {
+      throw UvCmErrors.ILLEGAL_PARAMETERS
+    }
+
+    // Determine if this is the fitPoints constructor (second arg is not an array)
+    const isFitPointsConstructor = !Array.isArray(b)
+
+    if (isFitPointsConstructor) {
+      this._geo = new UvGeSpline3d(
+        a as UvGePoint3dLike[],
+        b as UvGeKnotParameterizationType,
+        c as number | undefined,
+        d as boolean | undefined
+      )
+    } else {
+      this._geo = new UvGeSpline3d(
+        a as UvGePoint3dLike[],
+        b as number[],
+        c as number[] | undefined,
+        d as number | undefined,
+        e as boolean | undefined
+      )
+    }
+  }
+
+  /**
+   * Gets the geometric extents (bounding box) of this spline.
+   *
+   * @returns The bounding box that encompasses the entire spline
+   *
+   * @example
+   * ```typescript
+   * const extents = spline.geometricExtents;
+   * console.log(`Spline bounds: ${extents.minPoint} to ${extents.maxPoint}`);
+   * ```
+   */
+  get geometricExtents() {
+    return this._geo.box
+  }
+
+  /**
+   * Gets whether this spline is closed.
+   *
+   * A closed spline forms a complete loop where the end point connects to the start point.
+   *
+   * @returns True if the spline is closed, false otherwise
+   *
+   * @example
+   * ```typescript
+   * const isClosed = spline.closed;
+   * console.log(`Spline is closed: ${isClosed}`);
+   * ```
+   */
+  get closed(): boolean {
+    return this._geo.closed
+  }
+
+  /**
+   * Sets whether this spline is closed.
+   *
+   * @param value - True to close the spline, false to open it
+   *
+   * @example
+   * ```typescript
+   * spline.closed = true; // Close the spline
+   * ```
+   */
+  set closed(value: boolean) {
+    this._geo.closed = value
+  }
+
+  /**
+   * Gets the object snap points for this spline.
+   *
+   * Object snap points are precise points that can be used for positioning
+   * when drawing or editing. This method provides snap points based on the
+   * specified snap mode.
+   *
+   * @param osnapMode - The object snap mode
+   * @param _pickPoint - The point where the user picked
+   * @param _lastPoint - The last point
+   * @param snapPoints - Array to populate with snap points
+   */
+  subGetOsnapPoints(
+    osnapMode: UvDbOsnapMode,
+    _pickPoint: UvGePoint3dLike,
+    _lastPoint: UvGePoint3dLike,
+    snapPoints: UvGePoint3dLike[]
+  ) {
+    switch (osnapMode) {
+      case UvDbOsnapMode.EndPoint:
+        snapPoints.push(this._geo.startPoint)
+        snapPoints.push(this._geo.endPoint)
+        break
+      default:
+        break
+    }
+  }
+
+  /**
+   * Draws this spline using the specified renderer.
+   *
+   * This method renders the spline as a series of connected line segments
+   * using the spline's current style properties.
+   *
+   * @param renderer - The renderer to use for drawing
+   * @returns The rendered spline entity, or undefined if drawing failed
+   */
+  subWorldDraw(renderer: UvGiRenderer) {
+    const points = this._geo.getPoints(100)
+    return renderer.lines(points)
+  }
+}

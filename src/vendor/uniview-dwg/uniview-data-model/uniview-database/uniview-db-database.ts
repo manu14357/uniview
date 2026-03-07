@@ -1,0 +1,1098 @@
+/* eslint-disable simple-import-sort/imports */
+import { UvCmColor, UvCmEventManager } from '@uniview/common'
+
+import { UvDbObject, UvDbObjectId } from '../uniview-base'
+import { UvDbRegenerator } from '../uniview-converter'
+import {
+  UvDbConverterType,
+  UvDbDatabaseConverterManager,
+  UvDbFileType
+} from './uniview-db-database-converter-manager'
+import { UvDbEntity } from '../uniview-entity'
+import { UvDbAngleUnits, UvDbDataGenerator, UvDbUnitsValue } from '../uniview-misc'
+import {
+  UvDbDictionary,
+  UvDbLayoutDictionary,
+  UvDbRasterImageDef,
+  UvDbXrecord
+} from '../uniview-object'
+import { UvDbBlockTable } from './uniview-db-block-table'
+import { UvDbBlockTableRecord } from './uniview-db-block-table-record'
+import { UvDbConversionStage, UvDbStageStatus } from './uniview-db-database-converter'
+import { UvDbDimStyleTable } from './uniview-db-dim-style-table'
+import { UvDbLayerTable } from './uniview-db-layer-table'
+import {
+  UvDbLayerTableRecord,
+  UvDbLayerTableRecordAttrs
+} from './uniview-db-layer-table-record'
+import { UvDbLinetypeTable } from './uniview-db-linetype-table'
+import { UvDbTextStyleTable } from './uniview-db-text-style-table'
+import { UvDbViewportTable } from './uniview-db-viewport-table'
+import {
+  UvGeBox3d,
+  UvGePoint3d,
+  UvGePoint3dLike
+} from '@uniview/geometry'
+import { UvDbDwgVersion } from './uniview-db-dwg-version'
+import { UvGiLineWeight } from '@uniview/graphics'
+import { UvDbRegAppTable } from './uniview-db-reg-app-table'
+import { UvDbRegAppTableRecord } from './uniview-db-reg-app-table-record'
+import { UvDbSysVarManager, UvDbSysVarType } from './uniview-db-sys-var-manager'
+
+/**
+ * Event arguments for object events in the dictionary.
+ */
+export interface UvDbDictObjectEventArgs {
+  /** The database that triggered the event */
+  database: UvDbDatabase
+  /** The object (or objects) involved in the event */
+  object: UvDbObject | UvDbObject[]
+  /** The key name of the object */
+  key: string
+}
+
+/**
+ * Event arguments for entity-related events.
+ */
+export interface UvDbEntityEventArgs {
+  /** The database that triggered the event */
+  database: UvDbDatabase
+  /** The entity (or entities) involved in the event */
+  entity: UvDbEntity | UvDbEntity[]
+}
+
+/**
+ * Event arguments for layer-related events.
+ */
+export interface UvDbLayerEventArgs {
+  /** The database that triggered the event */
+  database: UvDbDatabase
+  /** The layer involved in the event */
+  layer: UvDbLayerTableRecord
+}
+
+/**
+ * Event arguments for layer modification events.
+ */
+export interface UvDbLayerModifiedEventArgs extends UvDbLayerEventArgs {
+  /** The changes made to the layer */
+  changes: Partial<UvDbLayerTableRecordAttrs>
+}
+
+/**
+ * The stage of opening one drawing file
+ */
+export type UvDbOpenFileStage = 'FETCH_FILE' | 'CONVERSION'
+
+/**
+ * Event arguments for progress events during database operations.
+ */
+export interface UvDbProgressEventArgs {
+  /** The database that triggered the event */
+  database: UvDbDatabase
+  /** The progress percentage (0-100) */
+  percentage: number
+  /** The current stage of opening one drawing file */
+  stage: UvDbOpenFileStage
+  /** The current sub stage */
+  subStage?: UvDbConversionStage
+  /** The status of the current sub stage */
+  subStageStatus: UvDbStageStatus
+  /**
+   * Store data associated with the current sub stage. Its meaning of different sub stages
+   * are as follows.
+   * - 'PARSE' stage: statistics of parsing task
+   * - 'FONT' stage: fonts needed by this drawing
+   *
+   * Note: For now, 'PARSE' and 'FONT' sub stages use this field only.
+   */
+  data?: unknown
+}
+
+/**
+ * @deprecated Use {@link UvDbProgressEventArgs} instead.
+ */
+export type UvDbProgressdEventArgs = UvDbProgressEventArgs
+
+/**
+ * Font information structure.
+ *
+ * Contains information about a font including its name, file path,
+ * type, and URL for loading.
+ */
+export interface UvDbFontInfo {
+  /** Array of font names/aliases */
+  name: string[]
+  /** Font file name */
+  file: string
+  /** Font type (mesh or shx) */
+  type: 'mesh' | 'shx'
+  /** URL for loading the font */
+  url: string
+}
+
+/**
+ * Interface for loading fonts when opening a document.
+ *
+ * Applications should implement this interface to provide font loading
+ * functionality when opening drawing databases that contain text entities.
+ */
+export interface UvDbFontLoader {
+  /**
+   * Loads the specified fonts.
+   *
+   * @param fontNames - Array of font names to load
+   * @returns Promise that resolves when fonts are loaded
+   *
+   * @example
+   * ```typescript
+   * const fontLoader: UvDbFontLoader = {
+   *   async load(fontNames: string[]) {
+   *     // Load fonts implementation
+   *   },
+   *   async getAvaiableFonts() {
+   *     return [];
+   *   }
+   * };
+   * ```
+   */
+  load(fontNames: string[]): Promise<void>
+
+  /**
+   * Gets all available fonts.
+   *
+   * @returns Promise that resolves to an array of available font information
+   *
+   * @example
+   * ```typescript
+   * const fonts = await fontLoader.getAvaiableFonts();
+   * console.log('Available fonts:', fonts);
+   * ```
+   */
+  getAvaiableFonts(): Promise<UvDbFontInfo[]>
+}
+
+/**
+ * Options for reading a drawing database.
+ *
+ * These options control how a drawing database is opened and processed.
+ */
+export interface UvDbOpenDatabaseOptions {
+  /**
+   * Opens the drawing database in read-only mode.
+   *
+   * When true, the database will be opened in read-only mode, preventing
+   * any modifications to the database content.
+   */
+  readOnly?: boolean
+
+  /**
+   * Loader used to load fonts used in the drawing database.
+   *
+   * This loader will be used to load any fonts referenced by text entities
+   * in the drawing database.
+   */
+  fontLoader?: UvDbFontLoader
+
+  /**
+   * The minimum number of items in one chunk.
+   *
+   * If this value is greater than the total number of entities in the
+   * drawing database, the total number is used. This controls how the
+   * database processing is broken into chunks for better performance.
+   */
+  minimumChunkSize?: number
+}
+
+/**
+ * Interface defining the tables available in a drawing database.
+ *
+ * This interface provides access to all the symbol tables in the database,
+ * including block table, dimension style table, linetype table, text style table,
+ * layer table, and viewport table.
+ */
+export interface UvDbTables {
+  /** Registered application name table */
+  readonly appIdTable: UvDbRegAppTable
+  /** Block table containing block definitions */
+  readonly blockTable: UvDbBlockTable
+  /** Dimension style table containing dimension style definitions */
+  readonly dimStyleTable: UvDbDimStyleTable
+  /** Linetype table containing linetype definitions */
+  readonly linetypeTable: UvDbLinetypeTable
+  /** Text style table containing text style definitions */
+  readonly textStyleTable: UvDbTextStyleTable
+  /** Layer table containing layer definitions */
+  readonly layerTable: UvDbLayerTable
+  /** Viewport table containing viewport definitions */
+  readonly viewportTable: UvDbViewportTable
+}
+
+/**
+ * Options used to specify default data to create
+ */
+export interface UvDbCreateDefaultDataOptions {
+  layer?: boolean
+  lineType?: boolean
+  textStyle?: boolean
+  dimStyle?: boolean
+  layout?: boolean
+}
+
+/**
+ * The UvDbDatabase class represents an AutoCAD drawing file.
+ *
+ * Each UvDbDatabase object contains the various header variables, symbol tables,
+ * table records, entities, and objects that make up the drawing. The UvDbDatabase
+ * class has member functions to allow access to all the symbol tables, to read
+ * and write to DWG files, to get or set database defaults, to execute various
+ * database-level operations, and to get or set all header variables.
+ *
+ * @example
+ * ```typescript
+ * const database = new UvDbDatabase();
+ * await database.read(dxfData, { readOnly: true });
+ * const entities = database.tables.blockTable.modelSpace.entities;
+ * ```
+ */
+export class UvDbDatabase extends UvDbObject {
+  /** Version of the database */
+  private _version: UvDbDwgVersion
+  /** Angle base for the database */
+  private _angBase: number
+  /** Angle direction for the database */
+  private _angDir: number
+  /** Angle units for the database */
+  private _aunits: UvDbAngleUnits
+  /** Current entity color */
+  private _cecolor: UvCmColor
+  /** Current entity linetype scale */
+  private _celtscale: number
+  /** Current entity line weight value */
+  private _celweight: UvGiLineWeight
+  /** Current layer for the database */
+  private _clayer: string
+  /** The extents of current Model Space */
+  private _extents: UvGeBox3d
+  /** Insertion units for the database */
+  private _insunits: UvDbUnitsValue
+  /** Global linetype scale */
+  private _ltscale: number
+  /** The flag whether to display line weight */
+  private _lwdisplay: boolean
+  /** Point display mode */
+  private _pdmode: number
+  /** Point display size */
+  private _pdsize: number
+  /** Tables in the database */
+  private _tables: UvDbTables
+  /** Nongraphical objects in the database */
+  private _objects: {
+    readonly dictionary: UvDbDictionary<UvDbDictionary>
+    readonly imageDefinition: UvDbDictionary<UvDbRasterImageDef>
+    readonly layout: UvDbLayoutDictionary
+    readonly xrecord: UvDbDictionary<UvDbXrecord>
+  }
+  /** Current space (model space or paper space) */
+  private _currentSpace?: UvDbBlockTableRecord
+
+  /**
+   * Events that can be triggered by the database.
+   *
+   * These events allow applications to respond to various database operations
+   * such as entity modifications, layer changes, and progress updates.
+   */
+  private readonly _dictObjectSetEvent = new UvCmEventManager<UvDbDictObjectEventArgs>()
+
+  public readonly events = {
+    /** Fired when an object is set to the dictionary */
+    dictObjectSet: this._dictObjectSetEvent,
+    /**
+     * @deprecated Use {@link events.dictObjectSet} instead.
+     */
+    dictObjetSet: this._dictObjectSetEvent,
+    /** Fired when an object in the dictionary is removed */
+    dictObjectErased: new UvCmEventManager<UvDbDictObjectEventArgs>(),
+    /** Fired when an entity is appended to the database */
+    entityAppended: new UvCmEventManager<UvDbEntityEventArgs>(),
+    /** Fired when an entity is modified in the database */
+    entityModified: new UvCmEventManager<UvDbEntityEventArgs>(),
+    /** Fired when an entity is erased from the database */
+    entityErased: new UvCmEventManager<UvDbEntityEventArgs>(),
+    /** Fired when a layer is appended to the database */
+    layerAppended: new UvCmEventManager<UvDbLayerEventArgs>(),
+    /** Fired when a layer is modified in the database */
+    layerModified: new UvCmEventManager<UvDbLayerModifiedEventArgs>(),
+    /** Fired when a layer is erased from the database */
+    layerErased: new UvCmEventManager<UvDbLayerEventArgs>(),
+    /** Fired during database opening operations to report progress */
+    openProgress: new UvCmEventManager<UvDbProgressEventArgs>()
+  }
+
+  public static UNIVIEW_DWG_APPID = 'uniview-dwg'
+
+  /**
+   * Creates a new UvDbDatabase instance.
+   */
+  constructor() {
+    super()
+    this._version = new UvDbDwgVersion('AC1014')
+    this._angBase = 0
+    this._angDir = 0
+    this._aunits = UvDbAngleUnits.DecimalDegrees
+    this._celtscale = 1
+    this._cecolor = new UvCmColor()
+    this._celweight = UvGiLineWeight.ByLayer
+    this._clayer = '0'
+    this._extents = new UvGeBox3d()
+    // TODO: Default value is 1 (imperial) or 4 (metric)
+    this._insunits = UvDbUnitsValue.Millimeters
+    this._ltscale = 1
+    this._lwdisplay = true
+    this._pdmode = 0
+    this._pdsize = 0
+    this._tables = {
+      appIdTable: new UvDbRegAppTable(this),
+      blockTable: new UvDbBlockTable(this),
+      dimStyleTable: new UvDbDimStyleTable(this),
+      linetypeTable: new UvDbLinetypeTable(this),
+      textStyleTable: new UvDbTextStyleTable(this),
+      layerTable: new UvDbLayerTable(this),
+      viewportTable: new UvDbViewportTable(this)
+    }
+    this._objects = {
+      dictionary: new UvDbDictionary(this),
+      imageDefinition: new UvDbDictionary(this),
+      layout: new UvDbLayoutDictionary(this),
+      xrecord: new UvDbDictionary(this)
+    }
+    this._tables.appIdTable.add(
+      new UvDbRegAppTableRecord(UvDbDatabase.UNIVIEW_DWG_APPID)
+    )
+  }
+
+  /**
+   * Gets all tables in this drawing database.
+   *
+   * @returns Object containing all the symbol tables in the database
+   *
+   * @example
+   * ```typescript
+   * const tables = database.tables;
+   * const layers = tables.layerTable;
+   * const blocks = tables.blockTable;
+   * ```
+   */
+  get tables() {
+    return this._tables
+  }
+
+  /**
+   * Gets all nongraphical objects in this drawing database.
+   *
+   * @returns Object containing all nongraphical objects in the database
+   *
+   * @example
+   * ```typescript
+   * const objects = database.objects;
+   * const layout = objects.layout;
+   * ```
+   */
+  get objects() {
+    return this._objects
+  }
+
+  /**
+   * Gets the object ID of the UvDbBlockTableRecord of the current space.
+   *
+   * The current space can be either model space or paper space.
+   *
+   * @returns The object ID of the current space
+   *
+   * @example
+   * ```typescript
+   * const currentSpaceId = database.currentSpaceId;
+   * ```
+   */
+  get currentSpaceId() {
+    if (!this._currentSpace) {
+      this._currentSpace = this._tables.blockTable.modelSpace
+    }
+    return this._currentSpace.objectId
+  }
+
+  /**
+   * Sets the current space by object ID.
+   *
+   * @param value - The object ID of the block table record to set as current space
+   * @throws {Error} When the specified block table record ID doesn't exist
+   *
+   * @example
+   * ```typescript
+   * database.currentSpaceId = 'some-block-record-id';
+   * ```
+   */
+  set currentSpaceId(value: UvDbObjectId) {
+    const currentSpace = this.tables.blockTable.getIdAt(value)
+    if (currentSpace == null) {
+      throw new Error(
+        `[UvDbDatabase] The specified block table record id '${value}' doesn't exist in the drawing database!`
+      )
+    } else {
+      this._currentSpace = currentSpace
+    }
+  }
+
+  /**
+   * Gets the angle units for the database.
+   *
+   * This is the current AUNITS value for the database.
+   *
+   * @returns The angle units value
+   *
+   * @example
+   * ```typescript
+   * const angleUnits = database.aunits;
+   * ```
+   */
+  get aunits(): number {
+    return this._aunits
+  }
+
+  /**
+   * Sets the angle units for the database.
+   *
+   * @param value - The new angle units value
+   *
+   * @example
+   * ```typescript
+   * database.aunits = UvDbAngleUnits.DecimalDegrees;
+   * ```
+   */
+  set aunits(value: number) {
+    this.updateSysVar('aunits', this._aunits, value ?? 0, nextValue => {
+      this._aunits = nextValue
+    })
+  }
+
+  /**
+   * Gets the version of the database.
+   *
+   * @returns The version of the database
+   *
+   */
+  get version(): UvDbDwgVersion {
+    return this._version
+  }
+
+  /**
+   * Sets the version of the database.
+   *
+   * @param value - The version value of the database
+   */
+  set version(value: string | number) {
+    this.updateSysVar(
+      'version',
+      this._version,
+      new UvDbDwgVersion(value),
+      nextValue => {
+        this._version = nextValue
+      }
+    )
+  }
+
+  /**
+   * Gets the drawing-units value for automatic scaling of blocks, images, or xrefs.
+   *
+   * This is the current INSUNITS value for the database.
+   *
+   * @returns The insertion units value
+   *
+   * @example
+   * ```typescript
+   * const insertionUnits = database.insunits;
+   * ```
+   */
+  get insunits(): number {
+    return this._insunits
+  }
+
+  /**
+   * Sets the drawing-units value for automatic scaling.
+   *
+   * @param value - The new insertion units value
+   *
+   * @example
+   * ```typescript
+   * database.insunits = UvDbUnitsValue.Millimeters;
+   * ```
+   */
+  set insunits(value: number) {
+    // TODO: Default value is 1 (imperial) or 4 (metric)
+    this.updateSysVar('insunits', this._insunits, value ?? 4, nextValue => {
+      this._insunits = nextValue
+    })
+  }
+
+  /**
+   * Gets the line type scale factor.
+   *
+   * @returns The line type scale factor
+   *
+   * @example
+   * ```typescript
+   * const lineTypeScale = database.ltscale;
+   * ```
+   */
+  get ltscale(): number {
+    return this._ltscale
+  }
+
+  /**
+   * Sets the line type scale factor.
+   *
+   * @param value - The new line type scale factor
+   *
+   * @example
+   * ```typescript
+   * database.ltscale = 2.0;
+   * ```
+   */
+  set ltscale(value: number) {
+    this.updateSysVar('ltscale', this._ltscale, value ?? 1, nextValue => {
+      this._ltscale = nextValue
+    })
+  }
+
+  /**
+   * Gets the flag whether to display line weight.
+   *
+   * @returns The flag whether to display line weight.
+   *
+   * @example
+   * ```typescript
+   * const lineTypeScale = database.ltscale;
+   * ```
+   */
+  get lwdisplay(): boolean {
+    return this._lwdisplay
+  }
+
+  /**
+   * Sets the flag whether to display line weight.
+   *
+   * @param value - The flag whether to display line weight.
+   *
+   * @example
+   * ```typescript
+   * database.lwdisplay = true;
+   * ```
+   */
+  set lwdisplay(value: boolean) {
+    this.updateSysVar(
+      'lwdisplay',
+      this._lwdisplay,
+      value ?? false,
+      nextValue => {
+        this._lwdisplay = nextValue
+      }
+    )
+  }
+
+  /**
+   * Gets the color of new objects as they are created.
+   *
+   * @returns The current entity color
+   *
+   * @example
+   * ```typescript
+   * const currentColor = database.cecolor;
+   * ```
+   */
+  get cecolor(): UvCmColor {
+    return this._cecolor
+  }
+
+  /**
+   * Sets the color of new objects as they are created.
+   *
+   * @param value - The new current entity color
+   *
+   * @example
+   * ```typescript
+   * database.cecolor = new UvCmColor(0xFF0000);
+   * ```
+   */
+  set cecolor(value: UvCmColor) {
+    this.updateSysVar('cecolor', this._cecolor, value || 0, nextValue => {
+      this._cecolor = nextValue
+    })
+  }
+
+  /**
+   * The line type scaling for new objects relative to the ltscale setting. A line created with
+   * celtscale = 2 in a drawing with ltscale set to 0.5 would appear the same as a line created
+   * with celtscale = 1 in a drawing with ltscale = 1.
+   */
+  get celtscale(): number {
+    return this._celtscale
+  }
+  set celtscale(value: number) {
+    this.updateSysVar('celtscale', this._celtscale, value ?? 1, nextValue => {
+      this._celtscale = nextValue
+    })
+  }
+
+  /**
+   * The layer of new objects as they are created.
+   */
+  get celweight(): UvGiLineWeight {
+    return this._celweight
+  }
+  set celweight(value: UvGiLineWeight) {
+    this.updateSysVar(
+      'celweight',
+      this._celweight,
+      value ?? UvGiLineWeight.ByLayer,
+      nextValue => {
+        this._celweight = nextValue
+      }
+    )
+  }
+
+  /**
+   * The layer of new objects as they are created.
+   */
+  get clayer(): string {
+    return this._clayer
+  }
+  set clayer(value: string) {
+    this.updateSysVar('clayer', this._clayer, value ?? '0', nextValue => {
+      this._clayer = nextValue
+    })
+  }
+
+  /**
+   * The zero (0) base angle with respect to the current UCS in radians.
+   */
+  get angBase(): number {
+    return this._angBase
+  }
+  set angBase(value: number) {
+    this.updateSysVar('angbase', this._angBase, value ?? 0, nextValue => {
+      this._angBase = nextValue
+    })
+  }
+
+  /**
+   * The direction of positive angles.
+   * - 0: Counterclockwise
+   * - 1: Clockwise
+   */
+  get angDir(): number {
+    return this._angDir
+  }
+  set angDir(value: number) {
+    this.updateSysVar('angdir', this._angDir, value ?? 0, nextValue => {
+      this._angDir = nextValue
+    })
+  }
+
+  /**
+   * The current Model Space EXTMAX value
+   */
+  get extmax(): UvGePoint3d {
+    return this._extents.max
+  }
+  set extmax(value: UvGePoint3dLike) {
+    if (value) {
+      const oldExtMax = this._extents.max.clone()
+      this._extents.expandByPoint(value)
+      if (!this._extents.max.equals(oldExtMax)) {
+        this.triggerSysVarChangedEvent('extmax', oldExtMax, this._extents.max)
+      }
+    }
+  }
+
+  /**
+   * The current Model Space EXTMIN value
+   */
+  get extmin(): UvGePoint3d {
+    return this._extents.min
+  }
+  set extmin(value: UvGePoint3dLike) {
+    if (value) {
+      const oldExtMin = this._extents.min.clone()
+      this._extents.expandByPoint(value)
+      if (!this._extents.min.equals(oldExtMin)) {
+        this.triggerSysVarChangedEvent('extmin', oldExtMin, this._extents.min)
+      }
+    }
+  }
+
+  /**
+   * The extents of current Model Space
+   */
+  get extents() {
+    return this._extents
+  }
+
+  /**
+   * Point display mode. Please get more details on value of this property from [this page](https://help.autodesk.com/view/ACDLT/2022/ENU/?guid=GUID-82F9BB52-D026-4D6A-ABA6-BF29641F459B).
+   */
+  get pdmode(): number {
+    return this._pdmode
+  }
+  set pdmode(value: number) {
+    this.updateSysVar('pdmode', this._pdmode, value ?? 0, nextValue => {
+      this._pdmode = nextValue
+    })
+  }
+
+  /**
+   * Point display size.
+   * - 0: Creates a point at 5 percent of the drawing area height
+   * - > 0: Specifies an absolute size
+   * - < 0: Specifies a percentage of the viewport size
+   */
+  get pdsize(): number {
+    return this._pdsize
+  }
+  set pdsize(value: number) {
+    this.updateSysVar('pdsize', this._pdsize, value ?? 0, nextValue => {
+      this._pdsize = nextValue
+    })
+  }
+
+  /**
+   * Reads drawing data from a string or ArrayBuffer.
+   *
+   * This method parses the provided data and populates the database with
+   * the resulting entities, tables, and objects. The method supports
+   * both DXF and DWG file formats.
+   *
+   * @param data - The drawing data as a string or ArrayBuffer
+   *   - For DXF files: Pass a string containing the DXF content
+   *   - For DWG files: Pass an ArrayBuffer instance containing the binary DWG data
+   * @param options - Options for reading the database
+   * @param fileType - The type of file being read (defaults to DXF)
+   *
+   * @example
+   * ```typescript
+   * // Reading a DXF file (string)
+   * const database = new UvDbDatabase();
+   * await database.read(dxfString, { readOnly: true }, UvDbFileType.DXF);
+   *
+   * // Reading a DWG file (ArrayBuffer)
+   * const database = new UvDbDatabase();
+   * await database.read(dwgArrayBuffer, { readOnly: true }, UvDbFileType.DWG);
+   * ```
+   */
+  async read(
+    data: ArrayBuffer,
+    options: UvDbOpenDatabaseOptions,
+    fileType: UvDbConverterType = UvDbFileType.DXF
+  ) {
+    const converter = UvDbDatabaseConverterManager.instance.get(fileType)
+    if (converter == null)
+      throw new Error(
+        `Database converter for file type '${fileType}' isn't registered and can can't read this file!`
+      )
+
+    this.clear()
+
+    await converter.read(
+      data,
+      this,
+      (options && options.minimumChunkSize) || 10,
+      async (
+        percentage: number,
+        stage: UvDbConversionStage,
+        stageStatus: UvDbStageStatus,
+        data?: unknown
+      ) => {
+        this.events.openProgress.dispatch({
+          database: this,
+          percentage: percentage,
+          stage: 'CONVERSION',
+          subStage: stage,
+          subStageStatus: stageStatus,
+          data: data
+        })
+        if (
+          options &&
+          options.fontLoader &&
+          stage == 'FONT' &&
+          stageStatus == 'END'
+        ) {
+          const fonts = data
+            ? (data as string[])
+            : this.tables.textStyleTable.fonts
+          await options.fontLoader.load(fonts)
+        }
+      }
+    )
+  }
+
+  /**
+   * Read AutoCAD DXF or DWG drawing specified by the URL into the database object.
+   * The method automatically detects the file type based on the URL extension:
+   * - .dxf files are read as text using readAsText()
+   * - .dwg files are read as binary data using readAsArrayBuffer()
+   * @param url Input the URL linked to one AutoCAD DXF or DWG file
+   * @param options Input options to read drawing data
+   */
+  async openUri(url: string, options: UvDbOpenDatabaseOptions): Promise<void> {
+    this.events.openProgress.dispatch({
+      database: this,
+      percentage: 0,
+      stage: 'FETCH_FILE',
+      subStageStatus: 'START'
+    })
+
+    const response = await fetch(url)
+    if (!response.ok) {
+      this.events.openProgress.dispatch({
+        database: this,
+        percentage: 100,
+        stage: 'FETCH_FILE',
+        subStageStatus: 'ERROR'
+      })
+      throw new Error(
+        `Failed to fetch file '${url}' with HTTP status code '${response.status}'!`
+      )
+    }
+
+    const contentLength = response.headers.get('content-length')
+    const totalBytes = contentLength ? parseInt(contentLength, 10) : null
+    let loadedBytes = 0
+
+    // Create a reader to track progress
+    const reader = response.body?.getReader()
+    if (!reader) {
+      throw new Error('Failed to get response reader')
+    }
+
+    const chunks = []
+
+    while (true) {
+      const { done, value } = await reader.read()
+
+      if (done) {
+        break
+      }
+
+      chunks.push(value)
+      loadedBytes += value.length
+
+      // Calculate and report progress if we know the total size
+      if (totalBytes !== null) {
+        const percentage = Math.round((loadedBytes / totalBytes) * 100)
+        this.events.openProgress.dispatch({
+          database: this,
+          percentage: percentage,
+          stage: 'FETCH_FILE',
+          subStageStatus: 'IN-PROGRESS'
+        })
+      }
+    }
+
+    // Combine all chunks into a single buffer
+    const content = new Uint8Array(loadedBytes)
+    let position = 0
+    for (const chunk of chunks) {
+      content.set(chunk, position)
+      position += chunk.length
+    }
+
+    const fileName = this.getFileNameFromUri(url)
+    const fileExtension = fileName.toLowerCase().split('.').pop()
+    if (fileExtension === 'dwg') {
+      // DWG files are binary, convert to ArrayBuffer
+      await this.read(content.buffer, options, UvDbFileType.DWG)
+    } else if (fileExtension === 'dxf') {
+      await this.read(content.buffer, options, UvDbFileType.DXF)
+    } else {
+      await this.read(content.buffer, options, fileExtension)
+    }
+
+    this.events.openProgress.dispatch({
+      database: this,
+      percentage: 100,
+      stage: 'FETCH_FILE',
+      subStageStatus: 'END'
+    })
+  }
+
+  /**
+   * Triggers xxxAppended events with data in the database to redraw the associated viewer.
+   */
+  async regen() {
+    const converter = new UvDbRegenerator(this)
+    await converter.read(
+      null as unknown as ArrayBuffer,
+      this,
+      500,
+      async (
+        percentage: number,
+        stage: UvDbConversionStage,
+        stageStatus: UvDbStageStatus,
+        data?: unknown
+      ) => {
+        this.events.openProgress.dispatch({
+          database: this,
+          percentage: percentage,
+          stage: 'CONVERSION',
+          subStage: stage,
+          subStageStatus: stageStatus,
+          data: data
+        })
+      }
+    )
+  }
+
+  /**
+   * Create default layer, line type, dimension type, text style and layout.
+   * @param - Options to specify data to create
+   */
+  createDefaultData(
+    options: UvDbCreateDefaultDataOptions = {
+      layer: true,
+      lineType: true,
+      textStyle: true,
+      dimStyle: true,
+      layout: true
+    }
+  ) {
+    const generator = new UvDbDataGenerator(this)
+
+    // Create default layer
+    if (options.layer) {
+      generator.createDefaultLayer()
+    }
+
+    // Create default line type
+    if (options.lineType) {
+      generator.createDefaultLineType()
+    }
+
+    // Create default text style
+    if (options.textStyle) {
+      generator.createDefaultTextStyle()
+    }
+
+    // Create default dimension style
+    if (options.dimStyle) {
+      generator.createDefaultDimStyle()
+    }
+
+    // Create default layout for model space
+    if (options.layout) {
+      generator.createDefaultLayout()
+    }
+  }
+
+  /**
+   * Clears all data from the database.
+   *
+   * This method removes all entities, tables, and objects from the database,
+   * effectively resetting it to an empty state.
+   *
+   * @example
+   * ```typescript
+   * database.clear();
+   * ```
+   */
+  private clear() {
+    // Clear all tables and dictionaries
+    this._tables.blockTable.removeAll()
+    this._tables.dimStyleTable.removeAll()
+    this._tables.linetypeTable.removeAll()
+    this._tables.textStyleTable.removeAll()
+    this._tables.layerTable.removeAll()
+    this._tables.viewportTable.removeAll()
+    this._objects.layout.removeAll()
+    this._currentSpace = undefined
+    this._extents.makeEmpty()
+  }
+
+  /**
+   * Updates a sysvar value and dispatches the change event only when the value changed.
+   */
+  private updateSysVar<T>(
+    sysVarName: string,
+    currentValue: T,
+    nextValue: T,
+    setter: (nextValue: T) => void
+  ) {
+    if (!this.hasSysVarValueChanged(currentValue, nextValue)) {
+      return
+    }
+
+    setter(nextValue)
+    this.triggerSysVarChangedEvent(sysVarName, currentValue, nextValue)
+  }
+
+  /**
+   * Determines whether two sysvar values are different.
+   */
+  private hasSysVarValueChanged(currentValue: unknown, nextValue: unknown) {
+    if (currentValue instanceof UvCmColor && nextValue instanceof UvCmColor) {
+      return !currentValue.equals(nextValue)
+    }
+
+    if (
+      currentValue instanceof UvDbDwgVersion &&
+      nextValue instanceof UvDbDwgVersion
+    ) {
+      return currentValue.value !== nextValue.value
+    }
+
+    return !Object.is(currentValue, nextValue)
+  }
+
+  /**
+   * Triggers a system variable changed event with old/new values.
+   */
+  private triggerSysVarChangedEvent(
+    sysVarName: string,
+    oldValue: unknown,
+    newValue: unknown
+  ) {
+    const manager = UvDbSysVarManager.instance()
+    const name = sysVarName.toLowerCase()
+    const descriptor = manager.getDescriptor(name)
+    if (descriptor == null) {
+      return
+    }
+
+    manager.events.sysVarChanged.dispatch({
+      database: this,
+      name,
+      oldVal: oldValue as UvDbSysVarType,
+      newVal: newValue as UvDbSysVarType
+    })
+  }
+
+  /**
+   * Extracts the file name from a URI.
+   *
+   * @param uri - The URI to extract the file name from
+   * @returns The extracted file name, or empty string if extraction fails
+   * @private
+   */
+  private getFileNameFromUri(uri: string): string {
+    try {
+      // Create a new URL object
+      const url = new URL(uri)
+      // Get the pathname from the URL
+      const pathParts = url.pathname.split('/')
+      // Return the last part of the pathname as the file name
+      return pathParts[pathParts.length - 1] || ''
+    } catch (error) {
+      console.error('Invalid URI:', error)
+      return ''
+    }
+  }
+}
+/* eslint-enable simple-import-sort/imports */
