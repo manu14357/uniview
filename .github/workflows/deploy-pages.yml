@@ -35,17 +35,20 @@ jobs:
 
       - name: Prepare pages artifact
         run: |
-          # docs/ already contains index.html (docs site) + demo/ (built demo app)
-          # Copy worker files into the demo output since they are gitignored
-          mkdir -p docs/demo/workers
-          if [ -d demo/public/workers ]; then
-            cp -r demo/public/workers/* docs/demo/workers/ 2>/dev/null || true
-          fi
+          # docs/ already contains index.html (docs site)
+          # docs/demo/ was built by build:demo (includes workers)
           # Copy font files into the demo output
           mkdir -p docs/demo/fonts
           if [ -d demo/public/fonts ]; then
             cp -r demo/public/fonts/* docs/demo/fonts/ 2>/dev/null || true
           fi
+          # Copy vendor worker files into the demo output
+          mkdir -p docs/demo/workers
+          if [ -d demo/public/workers ]; then
+            cp -r demo/public/workers/* docs/demo/workers/ 2>/dev/null || true
+          fi
+          # Prevent GitHub Pages from ignoring files starting with _
+          touch docs/.nojekyll
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

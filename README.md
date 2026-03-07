@@ -24,7 +24,7 @@
 
 - **17 file formats** — PDF, DOCX, XLSX, DWG, DXF, PNG, SVG, TIFF, CSV, and more
 - **GPU-accelerated CAD** — Three.js WebGL rendering with geometry batching
-- **WebAssembly** — DWG parsing via libredwg-web WASM (no server needed)
+- **WebAssembly** — DWG parsing via bundled libredwg WASM engine (no server needed)
 - **Web Workers** — All file parsing runs off the main thread
 - **Virtual rendering** — PDF pages and XLSX rows load on demand
 - **Annotations** — SVG markup layer with pen, highlight, arrow, rectangle, text tools
@@ -88,7 +88,7 @@ const buffer = await fetch('/data/plan.dwg').then(r => r.arrayBuffer());
 
 | Category | Formats | Engine |
 |---|---|---|
-| **CAD Drawings** | DWG, DXF | Three.js WebGL + libredwg-web (WASM) |
+| **CAD Drawings** | DWG, DXF | Three.js WebGL + libredwg WASM |
 | **Documents** | PDF | Mozilla PDF.js (canvas) |
 | **Documents** | DOCX, DOC | mammoth.js (HTML conversion) |
 | **Spreadsheets** | XLSX, XLS, CSV | SheetJS (virtual table) |
@@ -333,6 +333,9 @@ npm run dev
 # Build library (ESM + CJS)
 npm run build
 
+# Build vendor workers (DXF parser, DWG parser, MTEXT renderer)
+npm run build:workers
+
 # Build demo for GitHub Pages
 npm run build:demo
 
@@ -362,14 +365,14 @@ uniview/
 │   │   ├── docx/             # mammoth.js renderer
 │   │   ├── xlsx/             # SheetJS table renderer
 │   │   ├── dxf/              # dxf-viewer + Three.js
-│   │   ├── dwg/              # libredwg-web + Three.js
+│   │   ├── dwg/              # @uniview/viewer + Three.js (libredwg WASM)
 │   │   └── image/            # Canvas/SVG renderer
 │   ├── hooks/                # React hooks for viewer control
 │   ├── store/                # Zustand state stores
 │   ├── ui/                   # Toolbar, annotations, common UI
 │   ├── utils/                # Format detection, export, colors, units
-│   ├── workers/              # Web Worker files
-│   └── vendor/               # Vendored DWG/DXF engine
+│   ├── workers/              # Web Worker documentation stubs
+│   └── vendor/               # Vendored @uniview DWG/DXF engine (libredwg WASM)
 ├── demo/                     # Demo application
 ├── docs/                     # GitHub Pages documentation site
 └── tests/                    # Unit + e2e tests
@@ -397,7 +400,7 @@ uniview/
 | Zustand | State management |
 | Tailwind CSS | Styling |
 | Web Workers | Off-thread parsing |
-| WebAssembly | DWG parsing (libredwg-web) |
+| WebAssembly | DWG parsing (bundled libredwg) |
 
 ## Browser Support
 

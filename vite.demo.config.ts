@@ -4,9 +4,8 @@ import { resolve } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 
 /**
- * Verify that pre-built worker files exist in demo/public/workers/.
- * These workers (dxf-parser-worker, libredwg-parser-worker, mtext-renderer-worker)
- * are pre-built and committed to the repo. This plugin just validates they're present.
+ * Verify that pre-built vendor worker files exist in demo/public/workers/.
+ * These are built by: npm run build:workers
  */
 function verifyWorkers() {
   return {
@@ -21,10 +20,14 @@ function verifyWorkers() {
         'mtext-renderer-worker.js',
       ];
 
-      for (const worker of requiredWorkers) {
-        if (!existsSync(resolve(workersDir, worker))) {
-          console.warn(`[uniview-dwg] Missing worker: ${worker} in demo/public/workers/`);
-        }
+      const missing = requiredWorkers.filter(
+        (w) => !existsSync(resolve(workersDir, w)),
+      );
+      if (missing.length > 0) {
+        console.warn(
+          `\n[uniview] Missing vendor workers: ${missing.join(', ')}\n` +
+          `         Run "npm run build:workers" first.\n`,
+        );
       }
     },
   };

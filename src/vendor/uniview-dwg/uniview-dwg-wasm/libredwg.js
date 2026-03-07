@@ -1,6 +1,6 @@
-import createModule from '../wasm/libredwg-web.js';
-import { LibreDwgConverter } from './converter';
-import { dwgCodePageToEncoding, dwgVersions } from './database';
+import createModule from './libredwg-web.js';
+import { LibreDwgConverter } from './uniview-converter';
+import { dwgCodePageToEncoding, dwgVersions } from './uniview-database';
 import { SvgConverter } from './svg';
 import { Dwg_File_Type, Dwg_Object_Type } from './types';
 export { createModule };

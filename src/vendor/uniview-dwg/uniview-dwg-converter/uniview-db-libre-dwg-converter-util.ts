@@ -1,7 +1,11 @@
 import { Dwg_File_Type, LibreDwg } from '@uniview/dwg-wasm'
 
+declare const __WASM_BASE_PATH__: string
+
 export async function parseDwg(data: string) {
-  const libredwg = await LibreDwg.create()
+  // __WASM_BASE_PATH__ is injected at build time by Vite (vite.workers.config.ts).
+  const basePath = typeof __WASM_BASE_PATH__ !== 'undefined' ? __WASM_BASE_PATH__ : undefined
+  const libredwg = await LibreDwg.create(basePath)
   if (libredwg == null) {
     throw new Error('libredwg is not loaded!')
   }

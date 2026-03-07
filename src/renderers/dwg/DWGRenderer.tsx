@@ -187,16 +187,19 @@ export default function DWGRenderer({
         settings.isShowAxesGizmo = false;
         settings.isShowStats = false;
 
+        // Use Vite's base URL so paths resolve on both localhost and GitHub Pages
+        const base = import.meta.env.BASE_URL ?? '/';
+
         // Create fresh instance attached to current container
         UvApDocManager.createInstance({
           container: containerRef.current,
           autoResize: true,
-          baseUrl: '/',
+          baseUrl: base,
           fontBaseUrl: 'https://cdn.jsdelivr.net/gh/manu14357/uniview@main/demo/public/fonts/',
           webworkerFileUrls: {
-            mtextRender: '/workers/mtext-renderer-worker.js',
-            dxfParser: '/workers/dxf-parser-worker.js',
-            dwgParser: '/workers/libredwg-parser-worker.js',
+            mtextRender: `${base}workers/mtext-renderer-worker.js`,
+            dxfParser: `${base}workers/dxf-parser-worker.js`,
+            dwgParser: `${base}workers/libredwg-parser-worker.js`,
           },
         });
 

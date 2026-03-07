@@ -6,4 +6,3 @@ docs/demo/
 coverage/
 test-results/
 playwright-report/
-demo/public/workers/

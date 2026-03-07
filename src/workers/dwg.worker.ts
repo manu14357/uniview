@@ -1,15 +1,14 @@
 /**
- * DWG Web Worker — stub file.
- * @uniview/viewer manages its own web workers internally
- * (libredwg-parser-worker, dxf-parser-worker, mtext-renderer-worker).
- * This file is kept for project structure compatibility.
+ * DWG Web Worker — NOT USED AT RUNTIME
+ *
+ * DWG/DXF parsing workers are built from the vendor source
+ * (src/vendor/uniview-dwg/) into demo/public/workers/ as:
+ *   - dxf-parser-worker.js    (DXF parsing via @uniview/dxf-parser)
+ *   - libredwg-parser-worker.js  (DWG parsing via libredwg WASM)
+ *   - mtext-renderer-worker.js   (MTEXT rendering via Three.js)
+ *
+ * Build them with: npm run build:workers
+ *
+ * This file exists only for documentation purposes.
  */
-
-self.addEventListener('message', (e: MessageEvent) => {
-  const { id } = e.data;
-  self.postMessage({
-    id,
-    type: 'error',
-    data: { message: 'DWG parsing is handled by @uniview/viewer internally' },
-  });
-});
+export {};

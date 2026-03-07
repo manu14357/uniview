@@ -1,4 +1,4 @@
-export * from './database';
+export * from './uniview-database';
 export * from './libredwg';
-export * from './types';
+export * from './uniview-types';
 //# sourceMappingURL=index.js.map
