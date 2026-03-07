@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+declare const __UNIVIEW_CACHE_BUST__: string;
+
 declare module '*.module.css' {
   const classes: Record<string, string>;
   export default classes;

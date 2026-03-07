@@ -61,6 +61,7 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis',
+    __UNIVIEW_CACHE_BUST__: JSON.stringify(Date.now().toString(36)),
   },
   optimizeDeps: {
     include: ['buffer', 'stream-browserify', 'events', 'util'],

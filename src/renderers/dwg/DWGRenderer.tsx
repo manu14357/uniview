@@ -197,9 +197,9 @@ export default function DWGRenderer({
           baseUrl: base,
           fontBaseUrl: 'https://cdn.jsdelivr.net/gh/manu14357/uniview@main/demo/public/fonts/',
           webworkerFileUrls: {
-            mtextRender: `${base}workers/mtext-renderer-worker.js`,
-            dxfParser: `${base}workers/dxf-parser-worker.js`,
-            dwgParser: `${base}workers/libredwg-parser-worker.js`,
+            mtextRender: `${base}workers/mtext-renderer-worker.js?v=${__UNIVIEW_CACHE_BUST__}`,
+            dxfParser: `${base}workers/dxf-parser-worker.js?v=${__UNIVIEW_CACHE_BUST__}`,
+            dwgParser: `${base}workers/libredwg-parser-worker.js?v=${__UNIVIEW_CACHE_BUST__}`,
           },
         });
 
