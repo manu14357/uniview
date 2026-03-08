@@ -6,6 +6,9 @@
 // Buffer polyfill for browser compatibility (required by iconv-lite/shx-parser)
 import './vendor/buffer-polyfill';
 
+// Library styles (Tailwind utilities used by UniView components)
+import './styles.css';
+
 // Main component
 export { default as UniView } from './core/UniView';
 

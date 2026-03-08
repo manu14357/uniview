@@ -261,7 +261,24 @@ export default function DXFRenderer({
         const unsubLayer = EventBus.on('layer:toggle', handleLayerToggle);
 
         setIsLoading(false);
-        syncZoom();
+
+        // Auto-fit the drawing to fill the viewport.
+        // Use requestAnimationFrame so the loading overlay is removed first and
+        // the container has its final dimensions.
+        requestAnimationFrame(() => {
+          if (cancelled || !viewerRef.current) return;
+          if (boundsRef.current) {
+            viewerRef.current.FitView(
+              boundsRef.current.minX,
+              boundsRef.current.maxX,
+              boundsRef.current.minY,
+              boundsRef.current.maxY,
+              0.1,
+            );
+            viewerRef.current.Render();
+          }
+          syncZoom();
+        });
 
         const docInfo: DocumentInfo = toDocumentInfo(
           {
@@ -314,6 +331,23 @@ export default function DXFRenderer({
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileData, fileName, theme, onLoad, onError]);
+
+  // Re-fit after resize events — dxf-viewer's autoResize handles canvas sizing,
+  // but we also re-fit the view so the drawing stays centered.
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || isLoading) return;
+
+    const onResized = () => {
+      const bounds = boundsRef.current;
+      if (bounds) {
+        viewer.FitView(bounds.minX, bounds.maxX, bounds.minY, bounds.maxY, 0.1);
+      }
+      viewer.Render();
+    };
+    viewer.Subscribe('resized', onResized);
+    return () => { try { viewer.Unsubscribe('resized', onResized); } catch { /* destroyed */ } };
+  }, [isLoading]);
 
   if (isLoading) {
     return (

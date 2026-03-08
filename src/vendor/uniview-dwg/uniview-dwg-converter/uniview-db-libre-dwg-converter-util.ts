@@ -4,7 +4,7 @@ export async function parseDwg(data: string) {
   // Pass null so Emscripten resolves the WASM via its built-in
   // `new URL("libredwg-web.wasm", self.location.href)` which
   // correctly derives the path from the worker script URL.
-  const libredwg = await LibreDwg.create(null)
+  const libredwg = await LibreDwg.create(null as unknown as undefined)
   if (libredwg == null) {
     throw new Error('libredwg is not loaded!')
   }

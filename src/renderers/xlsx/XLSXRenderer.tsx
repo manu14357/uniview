@@ -5,13 +5,11 @@ import { toDocumentInfo } from './xlsx.types';
 import SheetTabs from './SheetTabs';
 import { EventBus } from '../../core/EventBus';
 import { useViewerStore } from '../../store/viewerStore';
-
-const VIRTUAL_ROW_HEIGHT = 28;
-const VISIBLE_BUFFER = 10;
+import { useZoom } from '../../hooks/useZoom';
 
 /**
- * XLSX Renderer — uses SheetJS for parsing, virtual table for performance.
- * Supports multi-sheet navigation and row virtualization for large datasets.
+ * XLSX Renderer — uses SheetJS for parsing, renders a plain scrollable table.
+ * Supports multi-sheet navigation and zoom.
  */
 export default function XLSXRenderer({
   fileData,
@@ -23,8 +21,25 @@ export default function XLSXRenderer({
   const [data, setData] = useState<SpreadsheetData | null>(null);
   const [activeSheet, setActiveSheet] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
-  const [scrollTop, setScrollTop] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const zoom = useViewerStore((s) => s.zoom);
+  const { zoomIn, zoomOut } = useZoom();
+
+  // Handle Ctrl+wheel zoom on the spreadsheet
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        if (e.deltaY < 0) zoomIn();
+        else zoomOut();
+      }
+    };
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [zoomIn, zoomOut]);
+
   // Parse spreadsheet
   useEffect(() => {
     let cancelled = false;
@@ -95,17 +110,13 @@ export default function XLSXRenderer({
   const handleSheetChange = useCallback(
     (name: string) => {
       setActiveSheet(name);
-      setScrollTop(0);
+      if (containerRef.current) containerRef.current.scrollTop = 0;
       const sheetIndex = data?.sheetNames.indexOf(name) ?? 0;
       useViewerStore.getState().setCurrentPage(sheetIndex + 1);
       EventBus.emit('page:change', sheetIndex + 1);
     },
     [data],
   );
-
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setScrollTop(e.currentTarget.scrollTop);
-  }, []);
 
   if (isLoading || !data) {
     return (
@@ -119,62 +130,45 @@ export default function XLSXRenderer({
   const sheet = data.sheets[activeSheet];
   if (!sheet) return null;
 
-  // Virtual scroll calculations
-  const containerHeight = containerRef.current?.clientHeight ?? 600;
-  const totalHeight = sheet.rowCount * VIRTUAL_ROW_HEIGHT;
-  const startRow = Math.max(0, Math.floor(scrollTop / VIRTUAL_ROW_HEIGHT) - VISIBLE_BUFFER);
-  const endRow = Math.min(
-    sheet.rowCount,
-    Math.ceil((scrollTop + containerHeight) / VIRTUAL_ROW_HEIGHT) + VISIBLE_BUFFER,
-  );
-  const visibleRows = sheet.rows.slice(startRow, endRow);
-
   return (
     <div
-      className={`uv-xlsx-renderer flex h-full flex-col ${theme === 'dark' ? 'bg-gray-900' : 'bg-white'}`}
+      className={`uv-xlsx-renderer absolute inset-0 flex flex-col ${theme === 'dark' ? 'bg-gray-900' : 'bg-white'}`}
       role="document"
       aria-label={`Spreadsheet: ${fileName}`}
     >
-      {/* Table area with virtual scrolling */}
+      {/* Scrollable table area */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto"
-        onScroll={handleScroll}
+        className="min-h-0 flex-1 overflow-auto"
       >
-        <div style={{ height: totalHeight, position: 'relative' }}>
-          <table
-            className="w-full border-collapse text-sm"
-            style={{
-              position: 'absolute',
-              top: startRow * VIRTUAL_ROW_HEIGHT,
-            }}
-            role="grid"
-          >
-            <tbody>
-              {visibleRows.map((row, idx) => (
-                <tr
-                  key={startRow + idx}
-                  className={`${(startRow + idx) % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}`}
-                  style={{ height: VIRTUAL_ROW_HEIGHT }}
-                >
-                  {/* Row number */}
-                  <td className="w-12 border border-gray-200 bg-gray-100 px-2 text-center text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800">
-                    {startRow + idx + 1}
+        <table
+          className="border-collapse text-sm"
+          style={{ fontSize: `${zoom}rem` }}
+          role="grid"
+        >
+          <tbody>
+            {sheet.rows.map((row, rowIdx) => (
+              <tr
+                key={rowIdx}
+                className={`${rowIdx % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}`}
+              >
+                {/* Row number */}
+                <td className="sticky left-0 z-10 w-12 border border-gray-200 bg-gray-100 px-2 text-center text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800">
+                  {rowIdx + 1}
+                </td>
+                {Array.from({ length: sheet.columnCount }).map((_, colIdx) => (
+                  <td
+                    key={colIdx}
+                    className="whitespace-nowrap border border-gray-200 px-2 py-1 dark:border-gray-700 dark:text-gray-300"
+                    style={{ minWidth: (sheet.columnWidths[colIdx] ?? 100) * zoom }}
+                  >
+                    {row[colIdx] != null ? String(row[colIdx]) : ''}
                   </td>
-                  {Array.from({ length: sheet.columnCount }).map((_, colIdx) => (
-                    <td
-                      key={colIdx}
-                      className="border border-gray-200 px-2 py-1 dark:border-gray-700 dark:text-gray-300"
-                      style={{ minWidth: sheet.columnWidths[colIdx] ?? 100 }}
-                    >
-                      {row[colIdx] != null ? String(row[colIdx]) : ''}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* Sheet tabs */}

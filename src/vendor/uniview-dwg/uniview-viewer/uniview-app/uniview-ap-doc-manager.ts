@@ -6,7 +6,6 @@ import {
   uvdbHostApplicationServices,
   UvDbProgressdEventArgs,
   UvDbSysVarManager,
-  UvGeBox2d
 } from '@uniview/data-model'
 import { UvDbLibreDwgConverter } from '@uniview/dwg-converter'
 import { UvTrMTextRenderer } from '@uniview/three-renderer'
@@ -906,14 +905,11 @@ export class UvApDocManager {
       const doc = this.context.doc
       this.events.documentActivated.dispatch({ doc })
       this.setActiveLayout()
-      const db = doc.database
 
-      // The extents of drawing database may be empty. Espically dxf files.
-      if (db.extents.isEmpty()) {
-        this.curView.zoomToFitDrawing()
-      } else {
-        this.curView.zoomTo(new UvGeBox2d(db.extmin, db.extmax))
-      }
+      // Always use zoomToFitDrawing so we fit to the actual rendered scene
+      // box rather than the database header extents, which can be stale or
+      // include far-away entities that make the viewport appear zoomed-out.
+      this.curView.zoomToFitDrawing()
     }
   }
 

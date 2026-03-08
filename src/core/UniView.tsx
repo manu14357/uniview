@@ -293,9 +293,9 @@ function UniViewInner({
       )}
 
       {/* Main area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Document area */}
-        <div className="relative flex-1 overflow-auto bg-gray-100 dark:bg-gray-900">
+        <div className="relative min-h-0 flex-1 overflow-hidden bg-gray-100 dark:bg-gray-900">
           {store.isLoading && !isCAD ? (
             <LoadingSpinner message="Loading document..." />
           ) : (

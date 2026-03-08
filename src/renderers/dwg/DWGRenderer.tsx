@@ -243,6 +243,28 @@ export default function DWGRenderer({
 
         setIsLoading(false);
 
+        // Auto-fit the drawing to fill the viewport.
+        // Use requestAnimationFrame so the loading overlay is removed first and
+        // the container has its final dimensions before we fit the view.
+        const fitView = viewRef.current;
+        requestAnimationFrame(() => {
+          if (cancelled || !fitView) return;
+          try {
+            fitView.zoomToFitDrawing();
+          } catch { /* ignore if layout not ready */ }
+          // Also schedule a delayed second fit — some files need extra time
+          // for all entities to load and the scene box to stabilize.
+          setTimeout(() => {
+            if (cancelled || !fitView) return;
+            try {
+              fitView.zoomToFitDrawing();
+              const cam = fitView.activeLayoutView;
+              const z = (cam as unknown as { _camera: { zoom: number } })._camera?.zoom;
+              if (z != null) setZoomLevel(z);
+            } catch { /* ignore */ }
+          }, 800);
+        });
+
         // Extract real layer info from the loaded database
         const layers: CADLayer[] = [];
         try {

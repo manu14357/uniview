@@ -1,0 +1,9 @@
+/*
+ * UniView library styles — Tailwind utility classes used by components.
+ * This file is processed during the library build so that consumers
+ * get all required styles via `import 'univiewer/style.css'`.
+ *
+ * NOTE: Do NOT include @tailwind base — the consumer app provides its own reset.
+ */
+@tailwind components;
+@tailwind utilities;
