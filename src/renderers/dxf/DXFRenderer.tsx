@@ -7,6 +7,7 @@ import { useLayerStore } from '../../store/layerStore';
 import CADToolbar from '../../ui/toolbar/CADToolbar';
 import type { CADCoordinates } from '../../ui/toolbar/CADToolbar';
 import type { DxfViewer as DxfViewerType } from 'dxf-viewer';
+import type { Color } from 'three';
 
 /**
  * DXF Renderer — uses the dxf-viewer package which internally uses Three.js WebGL.
@@ -182,10 +183,19 @@ export default function DXFRenderer({
         const container = canvasWrapRef.current;
 
         // Create DxfViewer instance
-        const clearColor = theme === 'dark' ? 0x1a1a2e : 0xf0f0f0;
-        const THREE = await import('three');
+        const clearHex = theme === 'dark' ? 0x1a1a2e : 0xf0f0f0;
+        // Duck-typed Three.Color to avoid importing a second Three.js instance.
+        // dxf-viewer calls .getHex() and passes this to renderer.setClearColor()
+        // which checks .isColor and reads .r/.g/.b.
+        const clearColor = {
+          isColor: true,
+          r: ((clearHex >> 16) & 0xff) / 255,
+          g: ((clearHex >> 8) & 0xff) / 255,
+          b: (clearHex & 0xff) / 255,
+          getHex() { return clearHex; },
+        };
         const viewer = new DxfViewer(container, {
-          clearColor: new THREE.Color(clearColor),
+          clearColor: clearColor as unknown as Color,
           autoResize: true,
           antialias: true,
           colorCorrection: true,
@@ -349,100 +359,6 @@ export default function DXFRenderer({
     return () => { try { viewer.Unsubscribe('resized', onResized); } catch { /* destroyed */ } };
   }, [isLoading]);
 
-  if (isLoading) {
-    return (
-      <div
-        className="flex h-full flex-col items-center justify-center"
-        style={{ backgroundColor: theme === 'dark' ? '#0f172a' : '#f8fafc' }}
-        role="status"
-      >
-        {/* UniView logo */}
-        <div className="flex items-center gap-2.5 mb-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600">
-            <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
-          </div>
-          <span className="text-lg font-bold" style={{ color: theme === 'dark' ? '#e2e8f0' : '#1e293b' }}>
-            UniView
-          </span>
-        </div>
-
-        {/* File info card */}
-        <div
-          className="mb-8 rounded-xl border px-6 py-4 text-center"
-          style={{
-            backgroundColor: theme === 'dark' ? '#1e293b' : '#ffffff',
-            borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
-          }}
-        >
-          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#3b82f6' }}>
-            {fileName.split('.').pop()?.toUpperCase() ?? 'CAD'} File
-          </p>
-          <p
-            className="mt-1 max-w-[280px] truncate text-sm font-medium"
-            style={{ color: theme === 'dark' ? '#cbd5e1' : '#334155' }}
-          >
-            {fileName}
-          </p>
-          <p className="mt-0.5 text-xs" style={{ color: theme === 'dark' ? '#64748b' : '#94a3b8' }}>
-            {(fileData.byteLength / 1024).toFixed(1)} KB
-          </p>
-        </div>
-
-        {/* Loading stages */}
-        <div className="flex flex-col gap-2 text-xs" style={{ color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>
-          {[
-            { key: 'detecting', label: 'Detecting file format' },
-            { key: 'engine', label: 'Loading CAD engine' },
-            { key: 'parsing', label: 'Parsing drawing data' },
-            { key: 'rendering', label: 'Rendering geometry' },
-          ].map(({ key, label }) => {
-            const stages = ['detecting', 'engine', 'parsing', 'rendering'];
-            const currentIdx = stages.indexOf(loadingStage);
-            const stageIdx = stages.indexOf(key);
-            const isDone = stageIdx < currentIdx;
-            const isActive = stageIdx === currentIdx;
-            return (
-              <div key={key} className="flex items-center gap-2.5">
-                {isDone ? (
-                  <svg className="h-4 w-4 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                ) : isActive ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-blue-500" />
-                ) : (
-                  <div className="h-4 w-4 rounded-full border" style={{ borderColor: theme === 'dark' ? '#334155' : '#cbd5e1' }} />
-                )}
-                <span style={{
-                  color: isDone
-                    ? (theme === 'dark' ? '#64748b' : '#94a3b8')
-                    : isActive
-                      ? (theme === 'dark' ? '#e2e8f0' : '#1e293b')
-                      : undefined,
-                  fontWeight: isActive ? 500 : 400,
-                }}>
-                  {label}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Progress bar */}
-        {loadProgress > 0 && loadProgress < 1 && (
-          <div className="mt-4 h-1.5 w-48 overflow-hidden rounded-full" style={{ backgroundColor: theme === 'dark' ? '#334155' : '#e2e8f0' }}>
-            <div
-              className="h-full rounded-full bg-blue-500 transition-all"
-              style={{ width: `${loadProgress * 100}%` }}
-            />
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div
       ref={containerRef}
@@ -452,21 +368,121 @@ export default function DXFRenderer({
       role="img"
       aria-label={`DXF drawing: ${fileName}`}
     >
-      {/* Three.js canvas mounts here */}
-      <div ref={canvasWrapRef} className="absolute inset-0" />
+      {/* Three.js canvas mounts here — always in DOM so ref is available for init.
+          Wrapper uses absolute+inset-0 for sizing. canvasWrapRef uses w-full h-full
+          because dxf-viewer overrides position to "relative" via inline style, which
+          would break absolute positioning on the ref element itself. */}
+      <div className="absolute inset-0">
+        <div ref={canvasWrapRef} className="h-full w-full" />
+      </div>
 
-      {/* CAD floating toolbar */}
-      <CADToolbar
-        coordinates={coords}
-        zoom={zoomLevel}
-        activeMode={activeMode}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onFitView={handleFitView}
-        onModeChange={setActiveMode}
-        onGoToCoordinates={handleGoToCoordinates}
-        theme={theme === 'dark' ? 'dark' : 'light'}
-      />
+      {/* Loading overlay */}
+      {isLoading && (
+        <div
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center"
+          style={{ backgroundColor: theme === 'dark' ? '#0f172a' : '#f8fafc' }}
+          role="status"
+        >
+          {/* UniView logo */}
+          <div className="flex items-center gap-2.5 mb-6">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600">
+              <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+            </div>
+            <span className="text-lg font-bold" style={{ color: theme === 'dark' ? '#e2e8f0' : '#1e293b' }}>
+              UniView
+            </span>
+          </div>
+
+          {/* File info card */}
+          <div
+            className="mb-8 rounded-xl border px-6 py-4 text-center"
+            style={{
+              backgroundColor: theme === 'dark' ? '#1e293b' : '#ffffff',
+              borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
+            }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#3b82f6' }}>
+              {fileName.split('.').pop()?.toUpperCase() ?? 'CAD'} File
+            </p>
+            <p
+              className="mt-1 max-w-[280px] truncate text-sm font-medium"
+              style={{ color: theme === 'dark' ? '#cbd5e1' : '#334155' }}
+            >
+              {fileName}
+            </p>
+            <p className="mt-0.5 text-xs" style={{ color: theme === 'dark' ? '#64748b' : '#94a3b8' }}>
+              {(fileData.byteLength / 1024).toFixed(1)} KB
+            </p>
+          </div>
+
+          {/* Loading stages */}
+          <div className="flex flex-col gap-2 text-xs" style={{ color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>
+            {[
+              { key: 'detecting', label: 'Detecting file format' },
+              { key: 'engine', label: 'Loading CAD engine' },
+              { key: 'parsing', label: 'Parsing drawing data' },
+              { key: 'rendering', label: 'Rendering geometry' },
+            ].map(({ key, label }) => {
+              const stages = ['detecting', 'engine', 'parsing', 'rendering'];
+              const currentIdx = stages.indexOf(loadingStage);
+              const stageIdx = stages.indexOf(key);
+              const isDone = stageIdx < currentIdx;
+              const isActive = stageIdx === currentIdx;
+              return (
+                <div key={key} className="flex items-center gap-2.5">
+                  {isDone ? (
+                    <svg className="h-4 w-4 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  ) : isActive ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-blue-500" />
+                  ) : (
+                    <div className="h-4 w-4 rounded-full border" style={{ borderColor: theme === 'dark' ? '#334155' : '#cbd5e1' }} />
+                  )}
+                  <span style={{
+                    color: isDone
+                      ? (theme === 'dark' ? '#64748b' : '#94a3b8')
+                      : isActive
+                        ? (theme === 'dark' ? '#e2e8f0' : '#1e293b')
+                        : undefined,
+                    fontWeight: isActive ? 500 : 400,
+                  }}>
+                    {label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Progress bar */}
+          {loadProgress > 0 && loadProgress < 1 && (
+            <div className="mt-4 h-1.5 w-48 overflow-hidden rounded-full" style={{ backgroundColor: theme === 'dark' ? '#334155' : '#e2e8f0' }}>
+              <div
+                className="h-full rounded-full bg-blue-500 transition-all"
+                style={{ width: `${loadProgress * 100}%` }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* CAD floating toolbar — visible when loaded */}
+      {!isLoading && (
+        <CADToolbar
+          coordinates={coords}
+          zoom={zoomLevel}
+          activeMode={activeMode}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onFitView={handleFitView}
+          onModeChange={setActiveMode}
+          onGoToCoordinates={handleGoToCoordinates}
+          theme={theme === 'dark' ? 'dark' : 'light'}
+        />
+      )}
     </div>
   );
 }
