@@ -10,7 +10,7 @@
  */
 import { defineConfig, type Plugin } from 'vite';
 import { resolve, dirname, join } from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 
 /**
  * Replaces `import.meta.url` in the Emscripten glue code with a
@@ -103,6 +103,26 @@ function vendorDirectoryResolver(): Plugin {
         if (existsSync(`${prefixedPath}.js`)) return `${prefixedPath}.js`;
         // Try as directory with index.js
         if (existsSync(join(prefixedPath, 'index.js'))) return join(prefixedPath, 'index.js');
+
+        // Scan sibling directories for alternative prefixed names
+        // e.g. 'wasm' may live in 'uniview-dwg-wasm' instead of 'uniview-wasm'
+        const segmentParent = resolve(dir, parts.slice(0, i).join('/') || '.');
+        try {
+          if (existsSync(segmentParent)) {
+            const siblings = readdirSync(segmentParent);
+            for (const sibling of siblings) {
+              if (sibling === prefixed[i]) continue; // already tried
+              if (sibling.endsWith(`-${parts[i]}`) && sibling.startsWith('uniview-')) {
+                const altParts = [...parts];
+                altParts[i] = sibling;
+                const altPath = resolve(dir, altParts.join('/'));
+                if (existsSync(altPath)) return altPath;
+                if (existsSync(`${altPath}.js`)) return `${altPath}.js`;
+                if (existsSync(join(altPath, 'index.js'))) return join(altPath, 'index.js');
+              }
+            }
+          }
+        } catch { /* ignore */ }
       }
 
       // Try just as directory/index.js without prefix
