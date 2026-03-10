@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useViewerContext } from '../core/ViewerContext';
 import { useLayerStore } from '../store/layerStore';
+import { useViewerStore } from '../store/viewerStore';
 import { EventBus } from '../core/EventBus';
 
 /**
@@ -10,6 +11,7 @@ import { EventBus } from '../core/EventBus';
 export function useViewer() {
   const ctx = useViewerContext();
   const layerStore = useLayerStore();
+  const rotation = useViewerStore((s) => s.rotation);
 
   const goToPage = useCallback(
     (page: number) => {
@@ -64,6 +66,18 @@ export function useViewer() {
     [layerStore],
   );
 
+  const rotateCW = useCallback(() => {
+    const next = (rotation + 90) % 360;
+    useViewerStore.getState().setRotation(next);
+    EventBus.emit('rotation:change', next);
+  }, [rotation]);
+
+  const rotateCCW = useCallback(() => {
+    const next = (rotation + 270) % 360;
+    useViewerStore.getState().setRotation(next);
+    EventBus.emit('rotation:change', next);
+  }, [rotation]);
+
   return {
     /* State */
     format: ctx.format,
@@ -76,6 +90,7 @@ export function useViewer() {
     zoom: ctx.zoom,
     theme: ctx.theme,
     layout: ctx.layout,
+    rotation,
 
     /* Navigation actions */
     goToPage,
@@ -92,6 +107,10 @@ export function useViewer() {
     /* Layer actions */
     toggleLayer,
     layers: layerStore.layers,
+
+    /* Rotation actions */
+    rotateCW,
+    rotateCCW,
 
     /* Sidebar */
     sidebarOpen: ctx.sidebarOpen,

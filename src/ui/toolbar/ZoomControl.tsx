@@ -1,12 +1,26 @@
 import { useViewerStore } from '../../store/viewerStore';
 import { useZoom } from '../../hooks/useZoom';
+import { EventBus } from '../../core/EventBus';
 
 /**
- * Zoom controls — minus, percentage dropdown, plus, fit width, fit page.
+ * Zoom controls — minus, percentage dropdown, plus, fit width, fit page, rotate CW/CCW.
  */
 export default function ZoomControl() {
   const zoom = useViewerStore((s) => s.zoom);
+  const rotation = useViewerStore((s) => s.rotation);
   const { zoomIn, zoomOut, setZoom, fitWidth, fitPage } = useZoom();
+
+  const rotateCW = () => {
+    const next = (rotation + 90) % 360;
+    useViewerStore.getState().setRotation(next);
+    EventBus.emit('rotation:change', next);
+  };
+
+  const rotateCCW = () => {
+    const next = (rotation + 270) % 360;
+    useViewerStore.getState().setRotation(next);
+    EventBus.emit('rotation:change', next);
+  };
 
   const presets = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
 
@@ -79,6 +93,30 @@ export default function ZoomControl() {
       >
         <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
           <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0h8v12H6V4z" clipRule="evenodd" />
+        </svg>
+      </button>
+
+      <div className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-600" />
+
+      <button
+        onClick={rotateCCW}
+        className="rounded p-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+        aria-label="Rotate counter-clockwise"
+        title="Rotate left"
+      >
+        <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 110 14H4a1 1 0 110-2h7a5 5 0 100-10H5.414l2.293 2.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+        </svg>
+      </button>
+
+      <button
+        onClick={rotateCW}
+        className="rounded p-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+        aria-label="Rotate clockwise"
+        title="Rotate right"
+      >
+        <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M12.293 3.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 9H9a5 5 0 100 10h7a1 1 0 110 2H9a7 7 0 110-14h5.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
         </svg>
       </button>
     </div>

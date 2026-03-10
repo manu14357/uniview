@@ -6,6 +6,7 @@ import {
   uvdbHostApplicationServices,
   UvDbProgressdEventArgs,
   UvDbSysVarManager,
+  UvGeBox2d
 } from '@uniview/data-model'
 import { UvDbLibreDwgConverter } from '@uniview/dwg-converter'
 import { UvTrMTextRenderer } from '@uniview/three-renderer'
@@ -46,7 +47,6 @@ import { UvApContext } from './uniview-ap-context'
 import { UvApDocument } from './uniview-ap-document'
 import { UvApFontLoader } from './uniview-ap-font-loader'
 import { UvApProgress } from './uniview-ap-progress'
-import { UvApSettingManager } from './uniview-ap-setting-manager'
 import { UvApOpenDatabaseOptions } from './uniview-db-open-database-options'
 
 const DEFAULT_BASE_URL = '/'
@@ -112,12 +112,11 @@ export interface UvApDocManagerOptions {
    */
   autoResize?: boolean
   /**
-   * Base URL to load resources (such as fonts annd drawing templates) needed
+   * Base URL to load resources (such as fonts and drawing templates) needed
    */
   baseUrl?: string
   /**
-   * Base URL to load fonts. If not provided, falls back to `baseUrl + 'fonts/'`.
-   * This allows fonts to be served from a CDN independently from other resources.
+   * Base URL to load font files. If not provided, defaults to `baseUrl + 'fonts/'`.
    */
   fontBaseUrl?: string
   /**
@@ -293,7 +292,7 @@ export class UvApDocManager {
     this._context = new UvApContext(view, doc)
 
     this._fontLoader = new UvApFontLoader()
-    this._fontLoader.baseUrl = options.fontBaseUrl ?? this._baseUrl + 'fonts/'
+    this._fontLoader.baseUrl = options.fontBaseUrl ?? (this._baseUrl + 'fonts/')
     uvdbHostApplicationServices().workingDatabase = doc.database
 
     this._commandManager = new UvEdCommandStack()
@@ -434,15 +433,8 @@ export class UvApDocManager {
    *
    * @returns Array of available font names
    */
-  get availableFonts() {
-    return this._fontLoader.availableFonts
-  }
-
-  /**
-   * @deprecated Use {@link availableFonts} instead.
-   */
   get avaiableFonts() {
-    return this.availableFonts
+    return this._fontLoader.avaiableFonts
   }
 
   /**
@@ -905,11 +897,14 @@ export class UvApDocManager {
       const doc = this.context.doc
       this.events.documentActivated.dispatch({ doc })
       this.setActiveLayout()
+      const db = doc.database
 
-      // Always use zoomToFitDrawing so we fit to the actual rendered scene
-      // box rather than the database header extents, which can be stale or
-      // include far-away entities that make the viewport appear zoomed-out.
-      this.curView.zoomToFitDrawing()
+      // The extents of drawing database may be empty. Espically dxf files.
+      if (db.extents.isEmpty()) {
+        this.curView.zoomToFitDrawing()
+      } else {
+        this.curView.zoomTo(new UvGeBox2d(db.extmin, db.extmax))
+      }
     }
   }
 
@@ -938,12 +933,6 @@ export class UvApDocManager {
    * @param data - Progress data
    */
   private updateProgress(data: UvDbProgressdEventArgs) {
-    // When isShowProgress is false, the vendor overlay is hidden
-    // so that the host application can provide its own loading UI.
-    if (!UvApSettingManager.instance.isShowProgress) {
-      return
-    }
-
     if (data.stage === 'CONVERSION') {
       if (data.subStage) {
         const key =

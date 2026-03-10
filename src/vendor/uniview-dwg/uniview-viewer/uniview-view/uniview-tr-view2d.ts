@@ -220,7 +220,7 @@ export class UvTrView2d extends UvEdBaseView {
   initialize() {
     // This method is called after camera and render are created.
     // Children class can override this method to add its own logic
-    this.setCursor(UvEdCorsorType.Grab)
+    this.setCursor(UvEdCorsorType.Crosshair)
   }
 
   /**

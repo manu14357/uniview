@@ -176,6 +176,7 @@ export type ViewerEventMap = {
   'document:error': ViewerError;
   'page:change': number;
   'zoom:change': number;
+  'rotation:change': number;
   'layer:toggle': { layerId: string; visible: boolean };
   'annotation:add': Annotation;
   'annotation:remove': string;
@@ -184,6 +185,9 @@ export type ViewerEventMap = {
   'sidebar:toggle': boolean;
   'search:query': string;
   'search:result': { total: number; current: number };
+  'export:request': ExportOptions;
+  'export:complete': ExportResult;
+  'export:error': ViewerError;
 };
 
 /** Worker message types */
@@ -225,4 +229,25 @@ export interface RendererProps {
 /** React children prop helper */
 export interface WithChildren {
   children: ReactNode;
+}
+
+/** Export format for CAD file conversion */
+export type ExportFormat = 'svg' | 'png' | 'jpeg' | 'pdf';
+
+/** Options for exporting a CAD drawing */
+export interface ExportOptions {
+  format: ExportFormat;
+  /** Pixel scale multiplier for raster exports (default: 2) */
+  scale?: 1 | 2 | 4;
+  /** Background color hex (default: '#FFFFFF') */
+  background?: string;
+  /** Output file name (auto-generated if omitted) */
+  fileName?: string;
+}
+
+/** Result of a successful export */
+export interface ExportResult {
+  blob: Blob;
+  fileName: string;
+  format: ExportFormat;
 }

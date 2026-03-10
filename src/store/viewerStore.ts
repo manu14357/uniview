@@ -24,6 +24,9 @@ export interface ViewerStoreState {
   /* Zoom */
   zoom: number;
 
+  /* Rotation (0, 90, 180, 270) */
+  rotation: number;
+
   /* Theme & layout */
   theme: ThemeMode;
   layout: LayoutMode;
@@ -42,6 +45,7 @@ export interface ViewerStoreState {
   setCurrentPage: (page: number) => void;
   setTotalPages: (total: number) => void;
   setZoom: (zoom: number) => void;
+  setRotation: (rotation: number) => void;
   setTheme: (theme: ThemeMode) => void;
   setLayout: (layout: LayoutMode) => void;
   setSidebarOpen: (open: boolean) => void;
@@ -59,6 +63,7 @@ const initialState = {
   currentPage: 1,
   totalPages: 0,
   zoom: 1,
+  rotation: 0,
   theme: 'auto' as ThemeMode,
   layout: 'continuous' as LayoutMode,
   sidebarOpen: false,
@@ -77,6 +82,7 @@ export const useViewerStore = create<ViewerStoreState>((set) => ({
   setCurrentPage: (currentPage) => set({ currentPage }),
   setTotalPages: (totalPages) => set({ totalPages }),
   setZoom: (zoom) => set({ zoom }),
+  setRotation: (rotation) => set({ rotation: ((rotation % 360) + 360) % 360 }),
   setTheme: (theme) => set({ theme }),
   setLayout: (layout) => set({ layout }),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),

@@ -40,7 +40,7 @@ import {
   DwgTextEntity
 } from '@uniview/dwg-wasm'
 
-import { UvDbEntityConverter } from './uniview-db-entity-converter'
+import { UvDbEntityConverter } from "./uniview-db-entity-converter";
 
 const MODEL_SPACE = '*MODEL_SPACE'
 
@@ -395,14 +395,14 @@ export class UvDbLibreDwgConverter extends UvDbDatabaseConverter<DwgDatabase> {
       }
 
       // Don't process entities in block space until other blocks are processed
-      if (!dbBlock.isModelSpace && btr.entities && btr.entities.length > 0) {
+      if (!dbBlock.isModelSapce && btr.entities && btr.entities.length > 0) {
         this.processEntitiesInBlock(btr.entities, dbBlock)
       }
     })
   }
 
   protected processBlocks(_model: DwgDatabase, _db: UvDbDatabase) {
-    // Do nothing because entities are already processed in method processBlockTables
+    // Do nothing because entities are already processsed in method processBlockTables
   }
 
   private async processEntitiesInBlock(

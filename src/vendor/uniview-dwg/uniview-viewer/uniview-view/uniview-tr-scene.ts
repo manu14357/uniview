@@ -316,7 +316,7 @@ export class UvTrScene {
    */
   search(box: UvGeBox2d | UvGeBox3d) {
     const activeLayout = this.activeLayout
-    return activeLayout ? activeLayout.search(box) : []
+    return activeLayout ? activeLayout?.search(box) : []
   }
 
   addLayer(layer: UvEdLayerInfo) {

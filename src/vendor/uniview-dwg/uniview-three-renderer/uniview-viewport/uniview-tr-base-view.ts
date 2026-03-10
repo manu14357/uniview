@@ -163,18 +163,8 @@ export class UvTrBaseView {
 
     const width = size.x * margin
     const height = size.y * margin
-
-    // Compute scale relative to the camera frustum dimensions, not pixel
-    // dimensions.  updateCameraFrustum() sets the orthographic camera to
-    // ±frustum in Y and ±aspect*frustum in X, so the visible area at zoom=1
-    // is (2*aspect*frustum) × (2*frustum).  Using pixel dimensions here would
-    // produce an incorrect zoom level whenever the viewport size differs from
-    // the fixed frustum value (800).
-    const aspect = this._width / this._height
-    const frustumWidth = 2 * aspect * this._frustum
-    const frustumHeight = 2 * this._frustum
-    const widthRatio = frustumWidth / width
-    const heightRatio = frustumHeight / height
+    const widthRatio = this._width / width
+    const heightRatio = this._height / height
     const scale = Math.min(widthRatio, heightRatio)
 
     this.flyTo(center, scale)

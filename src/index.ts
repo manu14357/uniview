@@ -22,7 +22,8 @@ export { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 // Utilities
 export { detectFormat, isCADFormat, isImageFormat, isDocumentFormat, isSpreadsheetFormat } from './utils/fileDetector';
-export { exportToImage, exportToPDF } from './utils/exportUtils';
+export { exportToImage, exportToPDF, downloadBlob } from './utils/exportUtils';
+export { exportCAD, exportDwgToSvg, downloadExportResult } from './utils/cadExportUtils';
 export { aciToHex, hexToRgb, rgbToHex } from './utils/colorUtils';
 export { convertUnit, unitFromCode, unitLabel } from './utils/unitConverter';
 
@@ -53,4 +54,8 @@ export type {
   WorkerResponse,
   LoadingState,
   RendererProps,
+  ExportFormat,
+  ExportOptions,
+  ExportResult,
 } from './core/types';
+export type { DwgExportContext, DxfExportContext, CADExportContext } from './utils/cadExportUtils';

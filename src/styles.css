@@ -7,3 +7,6 @@
  */
 @tailwind components;
 @tailwind utilities;
+
+/* Suppress the vendor's built-in loading spinner — UniView uses its own React loading UI */
+.ml-ccl-overlay { display: none !important; }

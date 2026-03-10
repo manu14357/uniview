@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { RendererProps, DocumentInfo, CADLayer, ViewerError } from '../../core/types';
+import type { RendererProps, DocumentInfo, CADLayer, ViewerError, ExportOptions } from '../../core/types';
 import { toDocumentInfo } from './dwg.types';
 import { EventBus } from '../../core/EventBus';
 import { useViewerStore } from '../../store/viewerStore';
 import CADToolbar from '../../ui/toolbar/CADToolbar';
 import type { CADCoordinates } from '../../ui/toolbar/CADToolbar';
+import ExportDialog from '../../ui/common/ExportDialog';
+import { exportCAD, downloadExportResult } from '../../utils/cadExportUtils';
+import type { DwgExportContext } from '../../utils/cadExportUtils';
 import type {
   UvApDocManager as UvApDocManagerType,
   UvTrView2d as UvTrView2dType,
@@ -34,6 +37,10 @@ export default function DWGRenderer({
   const [coords, setCoords] = useState<CADCoordinates>({ x: 0, y: 0 });
   const [zoomLevel, setZoomLevel] = useState(1);
   const [activeMode, setActiveMode] = useState<'select' | 'pan'>('pan');
+
+  // Export dialog state
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const handleError = useCallback((message: string, err?: unknown) => {
     setIsLoading(false);
@@ -86,6 +93,36 @@ export default function DWGRenderer({
     const currentZoom = (cam as unknown as { _camera: { zoom: number } })._camera?.zoom ?? 1;
     view.flyTo({ x: target.x, y: target.y }, currentZoom);
     view.isDirty = true;
+  }, []);
+
+  /* ── Export handler ── */
+  const handleExport = useCallback(async (options: ExportOptions) => {
+    const view = viewRef.current;
+    if (!view) return;
+
+    setIsExporting(true);
+    try {
+      const context: DwgExportContext = {
+        type: 'dwg',
+        view: view as unknown as DwgExportContext['view'],
+      };
+
+      const result = await exportCAD(context, options);
+      downloadExportResult(result);
+      EventBus.emit('export:complete', result);
+      setShowExportDialog(false);
+    } catch (err) {
+      const viewerError: ViewerError = {
+        code: 'EXPORT_ERROR',
+        message: err instanceof Error ? err.message : 'Export failed',
+        format: 'dwg',
+        originalError: err instanceof Error ? err : undefined,
+      };
+      EventBus.emit('export:error', viewerError);
+      console.error('[DWG Export]', err);
+    } finally {
+      setIsExporting(false);
+    }
   }, []);
 
   /* ── Sync view mode from toolbar to vendor ── */
@@ -206,6 +243,18 @@ export default function DWGRenderer({
         docManagerRef.current = UvApDocManager.instance;
         viewRef.current = UvApDocManager.instance.curView as UvTrView2dType;
 
+        // Suppress the vendor's built-in progress spinner — we use our own React loading UI
+        try {
+          const mgr = UvApDocManager.instance as unknown as Record<string, unknown>;
+          const progress = mgr._progress as { hide: () => void; destroy: () => void } | undefined;
+          if (progress) {
+            progress.hide();
+            progress.destroy();
+          }
+          // Neuter updateProgress so the vendor can never re-show its spinner
+          mgr.updateProgress = () => {};
+        } catch { /* ignore if not accessible */ }
+
         if (cancelled) return;
         setLoadingStage('parsing');
 
@@ -242,28 +291,6 @@ export default function DWGRenderer({
         });
 
         setIsLoading(false);
-
-        // Auto-fit the drawing to fill the viewport.
-        // Use requestAnimationFrame so the loading overlay is removed first and
-        // the container has its final dimensions before we fit the view.
-        const fitView = viewRef.current;
-        requestAnimationFrame(() => {
-          if (cancelled || !fitView) return;
-          try {
-            fitView.zoomToFitDrawing();
-          } catch { /* ignore if layout not ready */ }
-          // Also schedule a delayed second fit — some files need extra time
-          // for all entities to load and the scene box to stabilize.
-          setTimeout(() => {
-            if (cancelled || !fitView) return;
-            try {
-              fitView.zoomToFitDrawing();
-              const cam = fitView.activeLayoutView;
-              const z = (cam as unknown as { _camera: { zoom: number } })._camera?.zoom;
-              if (z != null) setZoomLevel(z);
-            } catch { /* ignore */ }
-          }, 800);
-        });
 
         // Extract real layer info from the loaded database
         const layers: CADLayer[] = [];
@@ -440,6 +467,17 @@ export default function DWGRenderer({
           onFitView={handleFitView}
           onModeChange={handleModeChange}
           onGoToCoordinates={handleGoToCoordinates}
+          onExport={() => setShowExportDialog(true)}
+          theme={theme === 'dark' ? 'dark' : 'light'}
+        />
+      )}
+      {showExportDialog && (
+        <ExportDialog
+          sourceFormat="dwg"
+          fileName={fileName}
+          onExport={handleExport}
+          onClose={() => setShowExportDialog(false)}
+          isExporting={isExporting}
           theme={theme === 'dark' ? 'dark' : 'light'}
         />
       )}

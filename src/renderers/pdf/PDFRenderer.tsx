@@ -27,6 +27,7 @@ export default function PDFRenderer({
   const [visiblePages, setVisiblePages] = useState<Set<number>>(new Set([initialPage]));
   const [scale, setScale] = useState(initialZoom);
   const [currentPage, setCurrentPage] = useState(initialPage);
+  const [rotation, setRotation] = useState(0);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
   // Load PDF.js and parse document
@@ -194,6 +195,14 @@ export default function PDFRenderer({
     return unsub;
   }, []);
 
+  // Listen for rotation changes
+  useEffect(() => {
+    const unsub = EventBus.on('rotation:change', (deg) => {
+      setRotation(deg);
+    });
+    return unsub;
+  }, []);
+
   // Listen for page navigation events
   useEffect(() => {
     const unsub = EventBus.on('page:change', (page) => {
@@ -232,6 +241,7 @@ export default function PDFRenderer({
           pageNumber={pageData.pageNumber}
           pageData={pageData}
           scale={scale}
+          rotation={rotation}
           isVisible={visiblePages.has(pageData.pageNumber)}
           pdfDocument={pdfDocument}
           onRenderComplete={handleRenderComplete}

@@ -5,6 +5,7 @@ interface PDFPageProps {
   pageNumber: number;
   pageData: PDFPageData;
   scale: number;
+  rotation: number;
   isVisible: boolean;
   pdfDocument: unknown; // pdfjs-dist PDFDocumentProxy
   onRenderComplete?: (pageNumber: number) => void;
@@ -19,6 +20,7 @@ const PDFPage = memo(function PDFPage({
   pageNumber,
   pageData,
   scale,
+  rotation,
   isVisible,
   pdfDocument,
   onRenderComplete,
@@ -60,7 +62,8 @@ const PDFPage = memo(function PDFPage({
         if (cancelled) return;
 
         const dpr = window.devicePixelRatio || 1;
-        const viewport = page.getViewport({ scale: scale * dpr, rotation: pageData.rotation });
+        const totalRotation = (pageData.rotation + rotation) % 360;
+        const viewport = page.getViewport({ scale: scale * dpr, rotation: totalRotation });
 
         canvas.width = viewport.width;
         canvas.height = viewport.height;
@@ -92,11 +95,13 @@ const PDFPage = memo(function PDFPage({
       cancelled = true;
       renderTaskRef.current?.cancel();
     };
-  }, [isVisible, pdfDocument, pageNumber, scale, pageData.rotation, onRenderComplete]);
+  }, [isVisible, pdfDocument, pageNumber, scale, rotation, pageData.rotation, onRenderComplete]);
 
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-  const displayWidth = pageData.width * scale;
-  const displayHeight = pageData.height * scale;
+  const totalRotation = (pageData.rotation + rotation) % 360;
+  const isRotated90 = totalRotation === 90 || totalRotation === 270;
+  const displayWidth = isRotated90 ? pageData.height * scale : pageData.width * scale;
+  const displayHeight = isRotated90 ? pageData.width * scale : pageData.height * scale;
 
   return (
     <div

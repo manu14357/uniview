@@ -50,20 +50,48 @@ export async function exportToImage(
   return offscreen.convertToBlob({ type: `image/${format}`, quality });
 }
 
-/** Export current view as a downloadable file */
+/** Export current view as a downloadable PDF */
 export async function exportToPDF(
-  _element: HTMLElement,
-  _options: {
+  element: HTMLElement,
+  options: {
     fileName?: string;
     pageSize?: 'a4' | 'letter';
   } = {},
 ): Promise<Blob> {
-  // PDF export creates a minimal PDF wrapper around the rendered canvas
-  // For a full implementation, this would use a PDF generation library
-  throw new Error(
-    'PDF export requires a PDF generation library. ' +
-    'Consider using jsPDF or a similar package for full PDF export support.',
-  );
+  const { pageSize = 'a4' } = options;
+
+  const canvas =
+    element instanceof HTMLCanvasElement
+      ? element
+      : element.querySelector('canvas');
+
+  if (!canvas) {
+    throw new Error('No canvas element found for PDF export.');
+  }
+
+  const { jsPDF } = await import('jspdf');
+  const imgData = canvas.toDataURL('image/png');
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // Fit image into the chosen page size while maintaining aspect ratio
+  const pageDims = pageSize === 'letter'
+    ? { w: 612, h: 792 }   // points
+    : { w: 595.28, h: 841.89 }; // A4 in points
+
+  const scale = Math.min(pageDims.w / w, pageDims.h / h);
+  const imgW = w * scale;
+  const imgH = h * scale;
+  const offX = (pageDims.w - imgW) / 2;
+  const offY = (pageDims.h - imgH) / 2;
+
+  const pdf = new jsPDF({
+    orientation: w >= h ? 'landscape' : 'portrait',
+    unit: 'pt',
+    format: pageSize,
+  });
+  pdf.addImage(imgData, 'PNG', offX, offY, imgW, imgH);
+  return pdf.output('blob');
 }
 
 /** Trigger a file download in the browser */

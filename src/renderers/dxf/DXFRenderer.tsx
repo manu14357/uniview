@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { RendererProps, DocumentInfo, ViewerError, CADLayer } from '../../core/types';
+import type { RendererProps, DocumentInfo, ViewerError, CADLayer, ExportOptions } from '../../core/types';
 import { toDocumentInfo } from './dxf.types';
 import { EventBus } from '../../core/EventBus';
 import { useViewerStore } from '../../store/viewerStore';
 import { useLayerStore } from '../../store/layerStore';
 import CADToolbar from '../../ui/toolbar/CADToolbar';
 import type { CADCoordinates } from '../../ui/toolbar/CADToolbar';
+import ExportDialog from '../../ui/common/ExportDialog';
+import { exportCAD, downloadExportResult } from '../../utils/cadExportUtils';
+import type { DxfExportContext } from '../../utils/cadExportUtils';
 import type { DxfViewer as DxfViewerType } from 'dxf-viewer';
 import type { Color } from 'three';
 
@@ -40,6 +43,10 @@ export default function DXFRenderer({
   const [coords, setCoords] = useState<CADCoordinates>({ x: 0, y: 0 });
   const [zoomLevel, setZoomLevel] = useState(1);
   const [activeMode, setActiveMode] = useState<'select' | 'pan'>('pan');
+
+  // Export dialog state
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   /** Read the zoom level from the camera and update state */
   const syncZoom = useCallback(() => {
@@ -128,6 +135,36 @@ export default function DXFRenderer({
     viewerRef.current?.ShowLayer(layerId, visible);
   }, []);
 
+  /* ── Export handler ── */
+  const handleExport = useCallback(async (options: ExportOptions) => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    setIsExporting(true);
+    try {
+      const context: DxfExportContext = {
+        type: 'dxf',
+        viewer: viewer as unknown as DxfExportContext['viewer'],
+      };
+
+      const result = await exportCAD(context, options);
+      downloadExportResult(result);
+      EventBus.emit('export:complete', result);
+      setShowExportDialog(false);
+    } catch (err) {
+      const viewerError: ViewerError = {
+        code: 'EXPORT_ERROR',
+        message: err instanceof Error ? err.message : 'Export failed',
+        format: 'dxf',
+        originalError: err instanceof Error ? err : undefined,
+      };
+      EventBus.emit('export:error', viewerError);
+      console.error('[DXF Export]', err);
+    } finally {
+      setIsExporting(false);
+    }
+  }, []);
+
   /* ── Mouse move handler for live coordinates ── */
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -200,6 +237,7 @@ export default function DXFRenderer({
           antialias: true,
           colorCorrection: true,
           blackWhiteInversion: theme === 'dark',
+          preserveDrawingBuffer: true,
           sceneOptions: {
             wireframeMesh: true,
           },
@@ -480,6 +518,17 @@ export default function DXFRenderer({
           onFitView={handleFitView}
           onModeChange={setActiveMode}
           onGoToCoordinates={handleGoToCoordinates}
+          onExport={() => setShowExportDialog(true)}
+          theme={theme === 'dark' ? 'dark' : 'light'}
+        />
+      )}
+      {showExportDialog && (
+        <ExportDialog
+          sourceFormat="dxf"
+          fileName={fileName}
+          onExport={handleExport}
+          onClose={() => setShowExportDialog(false)}
+          isExporting={isExporting}
           theme={theme === 'dark' ? 'dark' : 'light'}
         />
       )}
