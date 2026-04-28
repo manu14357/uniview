@@ -3,6 +3,8 @@ import type { RendererProps, DocumentInfo, CADLayer, ViewerError, ExportOptions 
 import { toDocumentInfo } from './dwg.types';
 import { EventBus } from '../../core/EventBus';
 import { useViewerStore } from '../../store/viewerStore';
+import { checkDWGVersion } from '../../utils/dwgVersionCheck';
+import { showToast } from '../../ui/common/Toast';
 import CADToolbar from '../../ui/toolbar/CADToolbar';
 import type { CADCoordinates } from '../../ui/toolbar/CADToolbar';
 import ExportDialog from '../../ui/common/ExportDialog';
@@ -12,6 +14,7 @@ import type {
   UvApDocManager as UvApDocManagerType,
   UvTrView2d as UvTrView2dType,
 } from '@uniview/viewer';
+import { uvdbHostApplicationServices } from '@uniview/data-model';
 
 /**
  * DWG Renderer — uses @uniview/viewer for high-quality DWG/DXF rendering.
@@ -32,6 +35,9 @@ export default function DWGRenderer({
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStage, setLoadingStage] = useState<'detecting' | 'engine' | 'parsing' | 'rendering'>('detecting');
   const [errorState, setErrorState] = useState<string | null>(null);
+  const [dwgVersionLabel, setDwgVersionLabel] = useState<string | null>(null);
+  const [isSlowLoad, setIsSlowLoad] = useState(false);
+  const cancelRef = useRef<(() => void) | null>(null);
 
   // CAD toolbar state
   const [coords, setCoords] = useState<CADCoordinates>({ x: 0, y: 0 });
@@ -191,10 +197,22 @@ export default function DWGRenderer({
       try {
         setIsLoading(true);
         setErrorState(null);
+        setIsSlowLoad(false);
         setLoadingStage('detecting');
 
-        // Brief pause so the user sees the file info on the loading screen
-        await new Promise(r => setTimeout(r, 400));
+        // DWG version pre-check — fail fast before loading WASM for unsupported versions
+        const versionInfo = checkDWGVersion(fileData);
+        if (versionInfo) {
+          setDwgVersionLabel(versionInfo.label);
+          if (!versionInfo.supported) {
+            handleError(
+              `This DWG file uses ${versionInfo.label} format (${versionInfo.code}), which is not yet supported. ` +
+              `Please re-save the drawing as AutoCAD 2018 (AC1032) or earlier.`
+            );
+            return;
+          }
+        }
+
         if (cancelled) return;
         setLoadingStage('engine');
 
@@ -258,15 +276,54 @@ export default function DWGRenderer({
         if (cancelled) return;
         setLoadingStage('parsing');
 
-        // Open the document from the ArrayBuffer
-        const success = await UvApDocManager.instance.openDocument(
-          fileName,
-          fileData,
-          {
-            minimumChunkSize: 1000,
-            mode: UvEdOpenMode.Write,
-          },
-        );
+        // Show a "taking longer than usual" hint after 10 seconds
+        const slowTimer = setTimeout(() => {
+          if (!cancelled) setIsSlowLoad(true);
+        }, 10_000);
+
+        // Intercept console.warn to:
+        //  1. Detect error code 68 (partial parse — file still renders)
+        //  2. Suppress noisy viewport-ID assignment messages from the vendor
+        let gotErrorCode68 = false;
+        const origWarn = console.warn;
+        const origError = console.error;
+        const interceptWarn = (...args: unknown[]) => {
+          const msg = args.join(' ');
+          if (msg.includes('Viewport id for handle')) return; // suppress
+          origWarn.apply(console, args);
+        };
+        const interceptError = (...args: unknown[]) => {
+          const msg = args.join(' ');
+          if (msg.includes('error code') && msg.includes('68')) {
+            gotErrorCode68 = true;
+            return; // suppress raw message; we'll show a toast instead
+          }
+          origError.apply(console, args);
+        };
+        console.warn = interceptWarn;
+        console.error = interceptError;
+
+        let openDocSuccess = false;
+        try {
+          // Race the openDocument call against a 45-second timeout
+          openDocSuccess = await Promise.race<boolean>([
+            UvApDocManager.instance.openDocument(
+              fileName,
+              fileData,
+              { minimumChunkSize: 1000, mode: UvEdOpenMode.Write },
+            ),
+            new Promise<boolean>((_, reject) =>
+              setTimeout(() => reject(new Error('DWG parsing timed out after 45 seconds. The file may be too large or the drawing engine failed to start.')), 45_000)
+            ),
+          ]);
+        } finally {
+          console.warn = origWarn;
+          console.error = origError;
+          clearTimeout(slowTimer);
+          setIsSlowLoad(false);
+        }
+
+        const success = openDocSuccess;
 
         if (cancelled) return;
 
@@ -286,11 +343,111 @@ export default function DWGRenderer({
           const cam = viewRef.current?.activeLayoutView;
           if (cam) {
             const z = (cam as unknown as { _camera: { zoom: number } })._camera?.zoom;
-            if (z != null) setZoomLevel(z);
+            if (z != null && isFinite(z) && z > 0) {
+              setZoomLevel(z);
+            }
           }
         });
 
         setIsLoading(false);
+
+        // Post-load: if model space is empty (all content lives in paper space layout
+        // sheets), automatically switch to the first non-Model layout so the drawing
+        // is visible. This is the normal case for sheet-based DWG workflows.
+        try {
+          const layoutManager = uvdbHostApplicationServices().layoutManager;
+          const db = UvApDocManager.instance.curDocument.database;
+
+          // Count entities in model space
+          let modelSpaceEntityCount = 0;
+          try {
+            const ms = db.tables?.blockTable?.modelSpace;
+            if (ms) {
+              for (const _ of (ms as unknown as { newIterator(): Iterable<unknown> }).newIterator()) {
+                modelSpaceEntityCount++;
+              }
+            }
+          } catch { /* ignore */ }
+
+          console.log('[DWG] modelSpaceEntityCount:', modelSpaceEntityCount, '| gotErrorCode68:', gotErrorCode68);
+
+          // Dump all block table records and their entity counts (main-thread, always visible)
+          try {
+            const blockTable = (db as any).tables?.blockTable;
+            if (blockTable) {
+              const iter = blockTable.newIterator?.();
+              if (iter) {
+                for (const btr of iter) {
+                  let count = 0;
+                  const typeNames: string[] = [];
+                  try {
+                    for (const e of (btr as any).newIterator()) {
+                      count++;
+                      const tn = (e as any).typeName ?? (e as any).constructor?.name ?? 'unknown';
+                      if (!typeNames.includes(tn)) typeNames.push(tn);
+                    }
+                  } catch { /* ignore per-block errors */ }
+                  console.log(`[DWG] Block "${(btr as any).name}": ${count} entities [${typeNames.join(', ')}]`);
+                }
+              }
+            }
+          } catch { /* ignore block dump errors */ }
+
+          if (modelSpaceEntityCount === 0) {
+            // Model space is empty — switch to the first paper space layout so the
+            // drawing sheet annotations and viewport frames are at least visible.
+            if (gotErrorCode68) {
+              // Error 68 means some entity types couldn't be parsed by libredwg.
+              // Combined with an empty model space this typically means the drawing
+              // content (geometry, hatching, dimensions) uses entity types the
+              // open-source parser cannot read.  Autodesk Viewer works because it
+              // uses its own proprietary reader.
+              setTimeout(() => showToast(
+                'Some drawing entities use unsupported formats — model space content is unavailable. Showing paper space layout only.',
+                'warning'
+              ), 300);
+            }
+
+            // Find all paper space layouts sorted by tabOrder, pick the first one
+            type LayoutEntry = { layoutName: string; tabOrder: number; blockTableRecordId: string };
+            const paperLayouts: LayoutEntry[] = [];
+            const layoutDict = db.objects?.layout;
+            if (layoutDict) {
+              const iter = (layoutDict as unknown as { newIterator(): Iterable<unknown> }).newIterator();
+              for (const entry of iter) {
+                const lay = entry as unknown as LayoutEntry;
+                // tabOrder 0 = Model, >0 = paper space sheets
+                if (lay.tabOrder > 0 && lay.layoutName) {
+                  paperLayouts.push(lay);
+                }
+              }
+            }
+            paperLayouts.sort((a, b) => a.tabOrder - b.tabOrder);
+
+            if (paperLayouts.length > 0) {
+              // Switch to the first paper layout — this fires layoutSwitched which
+              // triggers loadLayoutEntitiesIfNeeded in the view.
+              const first = paperLayouts[0];
+              layoutManager.setCurrentLayout(first.layoutName);
+              // Zoom to fit the paper space content once all entities are processed.
+              // zoomToFitDrawing() uses a condition waiter so it automatically waits
+              // for async batchConvert to finish before zooming.
+              viewRef.current?.zoomToFitDrawing();
+            } else {
+              // No layouts found — just refit whatever is in the scene
+              viewRef.current?.zoomToFitDrawing();
+            }
+          } else {
+            // Model space has entities — show them and fit the view.
+            if (gotErrorCode68) {
+              setTimeout(() => showToast(
+                'Some drawing entities could not be fully parsed — showing partial render.',
+                'warning'
+              ), 300);
+            }
+            viewRef.current?.zoomToFitDrawing();
+          }
+        } catch { /* ignore */ }
 
         // Extract real layer info from the loaded database
         const layers: CADLayer[] = [];
@@ -343,8 +500,12 @@ export default function DWGRenderer({
 
     loadAndRender();
 
+    // Expose a cancel function for the loading UI cancel button
+    cancelRef.current = () => { cancelled = true; };
+
     return () => {
       cancelled = true;
+      cancelRef.current = null;
       viewRef.current = null;
       if (docManagerRef.current) {
         docManagerRef.current.destroy().catch(() => {});
@@ -362,7 +523,7 @@ export default function DWGRenderer({
         backgroundColor: theme === 'dark' ? '#1a1a2e' : '#f0f0f0',
       }}
       onMouseMove={handleMouseMove}
-      role="img"
+      role="region"
       aria-label={`DWG drawing: ${fileName}`}
     >
       {isLoading && (
@@ -404,6 +565,11 @@ export default function DWGRenderer({
             <p className="mt-0.5 text-xs" style={{ color: theme === 'dark' ? '#64748b' : '#94a3b8' }}>
               {(fileData.byteLength / 1024).toFixed(1)} KB
             </p>
+            {dwgVersionLabel && (
+              <p className="mt-1 text-xs" style={{ color: theme === 'dark' ? '#475569' : '#94a3b8' }}>
+                {dwgVersionLabel}
+              </p>
+            )}
           </div>
 
           {/* Loading stages */}
@@ -444,6 +610,28 @@ export default function DWGRenderer({
               );
             })}
           </div>
+
+          {/* Slow-load hint + cancel button */}
+          {isSlowLoad && (
+            <p className="mt-4 text-xs" style={{ color: theme === 'dark' ? '#64748b' : '#94a3b8' }}>
+              Large file — still processing…
+            </p>
+          )}
+          {(loadingStage === 'parsing' || loadingStage === 'engine') && (
+            <button
+              className="mt-5 rounded-md border px-4 py-1.5 text-xs font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+              style={{
+                borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
+                color: theme === 'dark' ? '#94a3b8' : '#64748b',
+              }}
+              onClick={() => {
+                cancelRef.current?.();
+                handleError('Loading cancelled.');
+              }}
+            >
+              Cancel
+            </button>
+          )}
         </div>
       )}
       {errorState && (

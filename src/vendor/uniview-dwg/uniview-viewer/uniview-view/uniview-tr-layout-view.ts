@@ -168,7 +168,11 @@ export class UvTrLayoutView extends UvTrBaseView {
     this._renderer.clear()
     this._renderer.render(scene.internalScene, this._camera)
     const modelSpaceLayout = scene.modelSpaceLayout
-    if (modelSpaceLayout) {
+    // Only draw viewports when model space actually has geometry.
+    // If model space is empty (e.g. proxy entities libredwg can't decode),
+    // skip the viewport pass so the paper space background shows through
+    // the viewport rectangles instead of black.
+    if (modelSpaceLayout && !modelSpaceLayout.box.isEmpty()) {
       this.drawViewports(modelSpaceLayout.internalObject)
     }
     this._axesGizmo?.update()

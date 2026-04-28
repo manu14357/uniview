@@ -687,6 +687,13 @@ export class UvDbEntityConverter {
     dbViewport.width = viewport.width
     dbViewport.viewCenter.copy(viewport.displayCenter)
     dbViewport.viewHeight = viewport.viewHeight
+    console.log(
+      `[DWG Converter] Viewport id=${viewport.viewportId}` +
+      ` center=(${viewport.viewportCenter?.x?.toFixed(1)},${viewport.viewportCenter?.y?.toFixed(1)})` +
+      ` size=${viewport.width?.toFixed(1)}x${viewport.height?.toFixed(1)}` +
+      ` viewCenter=(${viewport.displayCenter?.x?.toFixed(1)},${viewport.displayCenter?.y?.toFixed(1)})` +
+      ` viewHeight=${viewport.viewHeight?.toFixed(1)}`
+    )
     return dbViewport
   }
 

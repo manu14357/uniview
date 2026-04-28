@@ -899,11 +899,17 @@ export class UvApDocManager {
       this.setActiveLayout()
       const db = doc.database
 
-      // The extents of drawing database may be empty. Espically dxf files.
-      if (db.extents.isEmpty()) {
+      // The extents of drawing database may be empty. Especially dxf files.
+      // Also guard against a degenerate (zero-size) extents box: when EXTMIN == EXTMAX
+      // (e.g. both are 0,0,0 in an unsaved or programmatically-created DWG), isEmpty()
+      // returns false (it's a valid point-box) but getSize() yields (0,0), causing
+      // zoomTo() to compute zoom = viewWidth / 0 = Infinity → black canvas.
+      const extBox = new UvGeBox2d(db.extmin, db.extmax)
+      const extSize = extBox.size
+      if (db.extents.isEmpty() || extSize.x <= 0 || extSize.y <= 0) {
         this.curView.zoomToFitDrawing()
       } else {
-        this.curView.zoomTo(new UvGeBox2d(db.extmin, db.extmax))
+        this.curView.zoomTo(extBox)
       }
     }
   }

@@ -85,7 +85,7 @@ export default function CADToolbar({
     setTimeout(() => xRef.current?.select(), 0);
   }, [coordinates.x, coordinates.y]);
 
-  const zoomPercent = Math.round(zoom * 100);
+  const zoomPercent = isFinite(zoom) && zoom > 0 ? Math.round(zoom * 100) : 100;
 
   return (
     <>

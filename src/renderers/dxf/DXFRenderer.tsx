@@ -38,6 +38,7 @@ export default function DXFRenderer({
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStage, setLoadingStage] = useState<'detecting' | 'engine' | 'parsing' | 'rendering'>('detecting');
   const [loadProgress, setLoadProgress] = useState(0);
+  const [isSlowLoad, setIsSlowLoad] = useState(false);
 
   // CAD toolbar state
   const [coords, setCoords] = useState<CADCoordinates>({ x: 0, y: 0 });
@@ -212,6 +213,9 @@ export default function DXFRenderer({
     const loadAndRender = async () => {
       try {
         setLoadingStage('engine');
+        setIsSlowLoad(false);
+
+        const slowTimer = setTimeout(() => setIsSlowLoad(true), 10_000);
 
         const { DxfViewer } = await import('dxf-viewer');
 
@@ -272,6 +276,8 @@ export default function DXFRenderer({
           });
         } finally {
           URL.revokeObjectURL(blobUrl);
+          clearTimeout(slowTimer);
+          setIsSlowLoad(false);
         }
 
         if (cancelled) {
@@ -503,6 +509,13 @@ export default function DXFRenderer({
                 style={{ width: `${loadProgress * 100}%` }}
               />
             </div>
+          )}
+
+          {/* Slow-load hint */}
+          {isSlowLoad && (
+            <p className="mt-4 text-xs" style={{ color: theme === 'dark' ? '#64748b' : '#94a3b8' }}>
+              Large file — still processing…
+            </p>
           )}
         </div>
       )}

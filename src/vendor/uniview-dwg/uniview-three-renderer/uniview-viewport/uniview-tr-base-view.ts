@@ -158,6 +158,10 @@ export class UvTrBaseView {
     const size = new UvGeVector2d()
     box.getSize(size)
 
+    // Guard against a degenerate (zero or negative-size) box that would produce
+    // zoom = viewWidth / 0 = Infinity, or zoom = 0 — both result in a black canvas.
+    if (size.x <= 0 || size.y <= 0) return
+
     const center = new UvGeVector2d()
     box.getCenter(center)
 

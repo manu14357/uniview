@@ -17,7 +17,7 @@ export default defineConfig({
       'buffer': 'buffer/',
       'stream': 'stream-browserify',
       'events': 'events',
-      'util': 'util',
+      'util': resolve(__dirname, 'src/utils/util-browser.ts'),
       '@': resolve(__dirname, 'src'),
       '@uniview/viewer': resolve(__dirname, 'src/vendor/uniview-dwg/uniview-viewer'),
       '@uniview/three-renderer': resolve(__dirname, 'src/vendor/uniview-dwg/uniview-three-renderer'),
@@ -38,6 +38,11 @@ export default defineConfig({
   define: {
     global: 'globalThis',
     __UNIVIEW_CACHE_BUST__: JSON.stringify(Date.now().toString(36)),
+    // Silence util.debuglog / util.inspect browser compatibility warnings from vendor libs
+    'process.env.NODE_DEBUG': JSON.stringify(''),
+  },
+  optimizeDeps: {
+    include: ['buffer', 'stream-browserify', 'events', 'util'],
   },
   build: {
     lib: {

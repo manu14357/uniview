@@ -382,7 +382,16 @@ export class UvDbLibreDwgConverter extends UvDbDatabaseConverter<DwgDatabase> {
 
   protected processBlockTables(model: DwgDatabase, db: UvDbDatabase) {
     const btrs = model.tables.BLOCK_RECORD.entries
+    console.log(`[DWG Converter] Total block records from WASM: ${btrs.length}`)
     btrs.forEach(btr => {
+      const entityCount = btr.entities?.length ?? 0
+      if (entityCount > 0) {
+        const types = btr.entities.map((e: DwgEntity) => e.type).join(', ')
+        console.log(`[DWG Converter] Block "${btr.name}" (handle=${btr.handle}): ${entityCount} entities [${types.length > 200 ? types.slice(0, 200) + '…' : types}]`)
+      } else {
+        console.log(`[DWG Converter] Block "${btr.name}" (handle=${btr.handle}): 0 entities`)
+      }
+
       let dbBlock = db.tables.blockTable.getAt(btr.name)
       if (!dbBlock) {
         dbBlock = new UvDbBlockTableRecord()
@@ -442,6 +451,14 @@ export class UvDbLibreDwgConverter extends UvDbDatabaseConverter<DwgDatabase> {
     model.tables.BLOCK_RECORD.entries.forEach(btr => {
       if (this.isModelSpace(btr.name)) entities = btr.entities
     })
+
+    const rawWasmCount = entities.length
+    console.log(`[DWG Converter] Model space raw WASM entities: ${rawWasmCount}`)
+    if (rawWasmCount > 0) {
+      const typeCounts: Record<string, number> = {}
+      entities.forEach((e: DwgEntity) => { typeCounts[e.type] = (typeCounts[e.type] ?? 0) + 1 })
+      console.log('[DWG Converter] Model space entity types:', typeCounts)
+    }
 
     // Create an instance of UvDbBatchProcessing
     const entityCount = entities.length

@@ -406,7 +406,10 @@ export class UvTrView2d extends UvEdBaseView {
     const waiter = new UvEdConditionWaiter(
       () => this._numOfEntitiesToProcess <= 0,
       () => {
-        if (this._scene.box) {
+        // Guard: only zoom if the scene box is non-empty (has actual geometry).
+        // An empty Three.js Box3 has min=+Inf/max=-Inf; passing it to zoomTo()
+        // would produce zoom=0 (invisible canvas).
+        if (this._scene.box && !this._scene.box.isEmpty()) {
           const box = UvTrGeometryUtil.threeBox3dToGeBox2d(this._scene.box)
           this.zoomTo(box)
           this._isDirty = true
